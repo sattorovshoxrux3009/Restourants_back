@@ -27,7 +27,7 @@ func (h *handlerV1) CreateAdmin(ctx *gin.Context) {
 		return
 	}
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
-	if err != nil {		
+	if err != nil {
 		log.Println(err)
 		ctx.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Error hashing password",
@@ -86,7 +86,6 @@ func (h *handlerV1) GetAdmins(ctx *gin.Context) {
 		limit = 10
 	}
 
-	
 	// Query parametrlarini olish
 	status := ctx.Query("status")
 	firstname := ctx.Query("firstname")     // firstname qidiruvi
@@ -208,18 +207,30 @@ func (h *handlerV1) UpdateAdmin(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, gin.H{"message": "Admin updated successfully"})
 }
 
-func (h *handlerV1) GetAdminDetails(ctx *gin.Context){
-	role, exists := ctx.Get("role")
-	if !exists {
-		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Role not found"})
+func (h *handlerV1) GetAdminDetails(ctx *gin.Context) {
+	id := ctx.Param("id")
+
+	intID, err := strconv.Atoi(id)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
 		return
 	}
 
-	if role != "super_admin" {
-		ctx.JSON(http.StatusForbidden, gin.H{
-			"error": "You do not have permission to update admin status",
-		})
+	admin, err := h.strg.Admin().GetById(ctx, intID)
+	if err != nil {
+		// Agar admin topilmasa, 404 statusi bilan javob qaytarish
+		ctx.JSON(http.StatusNotFound, gin.H{"error": "Admin not found"})
 		return
 	}
-
+	adminLogins, err := h.strg.Token().GetByAdminId(ctx, intID)
+	if err != nil {
+		// Agar loginslarni olishda xato bo'lsa, javob qaytarish
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Error fetching admin logins"})
+		return
+	}
+	ctx.JSON(http.StatusOK, gin.H{
+		"admin":        admin,
+		"admin_logins": adminLogins,
+		"admin_restourants":"",
+	})
 }

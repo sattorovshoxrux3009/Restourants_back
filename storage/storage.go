@@ -11,18 +11,21 @@ type StorageI interface {
 	SuperAdmin() repo.SuperAdminStorageI
 	Admin() repo.AdminStorageI
 	Token() repo.TokenStorageI
+	Restourants() repo.RestourantsI
 }
 type storagePg struct {
-	superAdminRepo repo.SuperAdminStorageI
-	adminRepo      repo.AdminStorageI
-	tokenRepo      repo.TokenStorageI
+	superAdminRepo  repo.SuperAdminStorageI
+	adminRepo       repo.AdminStorageI
+	tokenRepo       repo.TokenStorageI
+	restourantsRepo repo.RestourantsI
 }
 
 func NewStorage(mysqlConn *sql.DB) StorageI {
 	return &storagePg{
-		superAdminRepo: mysql.NewSuperAdminStorage(mysqlConn),
-		adminRepo:      mysql.NewAdminStorage(mysqlConn),
-		tokenRepo:      mysql.NewTokenStorage(mysqlConn),
+		superAdminRepo:  mysql.NewSuperAdminStorage(mysqlConn),
+		adminRepo:       mysql.NewAdminStorage(mysqlConn),
+		tokenRepo:       mysql.NewTokenStorage(mysqlConn),
+		restourantsRepo: mysql.NewRestourantsStorage(mysqlConn),
 	}
 }
 func (s *storagePg) SuperAdmin() repo.SuperAdminStorageI {
@@ -33,4 +36,7 @@ func (s *storagePg) Admin() repo.AdminStorageI {
 }
 func (s *storagePg) Token() repo.TokenStorageI {
 	return s.tokenRepo
+}
+func (s *storagePg) Restourants() repo.RestourantsI {
+	return s.restourantsRepo
 }
