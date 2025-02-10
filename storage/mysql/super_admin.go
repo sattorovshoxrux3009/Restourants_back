@@ -35,7 +35,7 @@ func (s *superAdminRepo) Create(ctx context.Context, req *repo.CreateSuperAdmin)
 	return req, nil
 }
 
-func (s *superAdminRepo) GetByUserneme(ctx context.Context, username string) (*repo.SuperAdmin, error) {
+func (s *superAdminRepo) GetByUsername(ctx context.Context, username string) (*repo.SuperAdmin, error) {
 	query := `
 		SELECT 
 			id, username,

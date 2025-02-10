@@ -3,6 +3,7 @@ package mysql
 import (
 	"context"
 	"database/sql"
+	"math"
 	"time"
 
 	"github.com/sattorovshoxrux3009/Restourants_back/storage/repo"
@@ -36,17 +37,141 @@ func (a *adminRepo) Create(ctx context.Context, req *repo.CreateAdmin) (*repo.Cr
 	return req, nil
 }
 
-func (a *adminRepo) GetAll(ctx context.Context) ([]repo.Admin, error) {
-	query := `SELECT id, first_name, last_name, email, phone_number, username, password_hash, created_at, status FROM admins`
+func (a *adminRepo) GetAll(ctx context.Context, status, firstname, lastname, email, phonenumber, username string, page, limit int) ([]repo.Admin, int, int, error) {
+	var total int
+	countQuery := `SELECT COUNT(*) FROM admins`
+	var args []interface{}
 
-	rows, err := a.db.QueryContext(ctx, query)
+	// Qidiruv parametrlarini qo‘shish
+	if status != "" {
+		countQuery += " WHERE status = ?"
+		args = append(args, status)
+	}
+
+	if firstname != "" {
+		if len(args) > 0 {
+			countQuery += " AND first_name LIKE ?"
+		} else {
+			countQuery += " WHERE first_name LIKE ?"
+		}
+		args = append(args, "%"+firstname+"%")
+	}
+
+	if lastname != "" {
+		if len(args) > 0 {
+			countQuery += " AND last_name LIKE ?"
+		} else {
+			countQuery += " WHERE last_name LIKE ?"
+		}
+		args = append(args, "%"+lastname+"%")
+	}
+
+	if email != "" {
+		if len(args) > 0 {
+			countQuery += " AND email LIKE ?"
+		} else {
+			countQuery += " WHERE email LIKE ?"
+		}
+		args = append(args, "%"+email+"%")
+	}
+
+	if phonenumber != "" {
+		if len(args) > 0 {
+			countQuery += " AND phone_number LIKE ?"
+		} else {
+			countQuery += " WHERE phone_number LIKE ?"
+		}
+		args = append(args, "%"+phonenumber+"%")
+	}
+
+	if username != "" {
+		if len(args) > 0 {
+			countQuery += " AND username LIKE ?"
+		} else {
+			countQuery += " WHERE username LIKE ?"
+		}
+		args = append(args, "%"+username+"%")
+	}
+
+	// Umumiy sonni olish
+	err := a.db.QueryRowContext(ctx, countQuery, args...).Scan(&total)
 	if err != nil {
-		return nil, err
+		return nil, 0, 0, err
+	}
+
+	// Nechta sahifa borligini hisoblash
+	totalPages := int(math.Ceil(float64(total) / float64(limit)))
+
+	// Adminlarni olish uchun so‘rov
+	query := `SELECT id, first_name, last_name, email, phone_number, username, password_hash, created_at, status 
+	          FROM admins`
+	args = nil // Fresh args list
+
+	// Qidiruv parametrlarini qo‘shish
+	if status != "" {
+		query += " WHERE status = ?"
+		args = append(args, status)
+	}
+
+	if firstname != "" {
+		if len(args) > 0 {
+			query += " AND first_name LIKE ?"
+		} else {
+			query += " WHERE first_name LIKE ?"
+		}
+		args = append(args, "%"+firstname+"%")
+	}
+
+	if lastname != "" {
+		if len(args) > 0 {
+			query += " AND last_name LIKE ?"
+		} else {
+			query += " WHERE last_name LIKE ?"
+		}
+		args = append(args, "%"+lastname+"%")
+	}
+
+	if email != "" {
+		if len(args) > 0 {
+			query += " AND email LIKE ?"
+		} else {
+			query += " WHERE email LIKE ?"
+		}
+		args = append(args, "%"+email+"%")
+	}
+
+	if phonenumber != "" {
+		if len(args) > 0 {
+			query += " AND phone_number LIKE ?"
+		} else {
+			query += " WHERE phone_number LIKE ?"
+		}
+		args = append(args, "%"+phonenumber+"%")
+	}
+
+	if username != "" {
+		if len(args) > 0 {
+			query += " AND username LIKE ?"
+		} else {
+			query += " WHERE username LIKE ?"
+		}
+		args = append(args, "%"+username+"%")
+	}
+
+	// Sahifani tartiblaymiz va limit qo‘shamiz
+	query += " ORDER BY id ASC LIMIT ? OFFSET ?"
+	args = append(args, limit, (page-1)*limit)
+
+	// So‘rovni bajarish
+	rows, err := a.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, 0, 0, err
 	}
 	defer rows.Close()
 
 	var admins []repo.Admin
 
+	// Natijalarni yig‘ish
 	for rows.Next() {
 		var admin repo.Admin
 		var createdAtStr string
@@ -63,21 +188,22 @@ func (a *adminRepo) GetAll(ctx context.Context) ([]repo.Admin, error) {
 			&admin.Status,
 		)
 		if err != nil {
-			return nil, err
+			return nil, 0, 0, err
 		}
+
 		admin.CreatedAt, err = time.Parse("2006-01-02 15:04:05", createdAtStr)
 		if err != nil {
-			return nil, err
+			return nil, 0, 0, err
 		}
 
 		admins = append(admins, admin)
 	}
 
 	if err = rows.Err(); err != nil {
-		return nil, err
+		return nil, 0, 0, err
 	}
 
-	return admins, nil
+	return admins, page, totalPages, nil
 }
 
 func (a *adminRepo) GetByUsername(ctx context.Context, username string) (*repo.Admin, error) {
@@ -168,6 +294,63 @@ func (a *adminRepo) UpdatePassword(ctx context.Context, username, password strin
 	}()
 	query := `UPDATE admins SET password_hash = ? WHERE username = ?`
 	_, err = tx.ExecContext(ctx, query, password, username)
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (a *adminRepo) UpdateStatus(ctx context.Context, id int, status string) error {
+	tx, err := a.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+	query := `UPDATE admins SET status = ? WHERE id = ?`
+	_, err = tx.ExecContext(ctx, query, status, id)
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (a *adminRepo) Update(ctx context.Context, id int, req *repo.UpdateAdmin) error {
+	tx, err := a.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+	query := `
+		UPDATE admins SET 
+			first_name = ?,
+			last_name = ?,
+			email = ?,
+			phone_number = ?,
+			username = ?,
+			password_hash = ? 
+		WHERE id = ?
+	`
+	_, err = tx.ExecContext(ctx, query, req.FirstName, req.LastName, req.Email, req.PhoneNumber, req.Username, req.PasswordHash, id)
 	if err != nil {
 		tx.Rollback()
 		return err

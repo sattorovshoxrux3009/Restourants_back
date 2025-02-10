@@ -26,13 +26,21 @@ func NewServer(opts *Options) *gin.Engine {
 	router.POST("/v1/create-s-admin", handler.CreateSuperAdmin)
 	router.POST("/v1/login", handler.Login)
 
-	// router.POST("/v1/login", handler.LoginUser)
-	// // Himoyalangan API-lar (Middleware ishlaydi)
-	protected := router.Group("/v1")
-	protected.Use(handler.AuthMiddleware()) // JWT tokenni tekshirish
+	superAdmin := router.Group("/v1")
+	superAdmin.Use(handler.AuthMiddleware(), handler.SuperAdminMiddleware())
 	{
-		protected.POST("/create-admin", handler.CreateAdmin) 
-		protected.GET("/all-admins",handler.GetAllAdmins)
+		superAdmin.GET("/admins", handler.GetAdmins)
+		superAdmin.GET("/admins/:id", handler.GetAdmins)
+		superAdmin.GET("/admins/:id/details", handler.GetAdminDetails)
+		superAdmin.POST("/create-admin", handler.CreateAdmin)
+		superAdmin.PUT("/update-admin/:id/status", handler.UpdateAdminStatus)
+		superAdmin.PUT("/update-admin/:id", handler.UpdateAdmin)
+	}
+
+	admin := router.Group("/v1")
+	admin.Use(handler.AuthMiddleware(), handler.AdminMiddleware())
+	{
+
 	}
 	return router
 }

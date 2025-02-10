@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"database/sql"
 	"fmt"
 	"log"
@@ -38,10 +37,7 @@ func main() {
 	}
 
 	strg := storage.NewStorage(mysqlConn)
-	err= strg.Admin().DeleteByUsername(context.TODO(),"2")
-	if err != nil {
-		log.Fatal("Err: ", err)
-	}
+
 	router := server.NewServer(&server.Options{
 		Strg: strg,
 	})

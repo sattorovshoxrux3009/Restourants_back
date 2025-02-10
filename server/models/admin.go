@@ -21,3 +21,14 @@ type CreateAdmin struct {
 	Username    string `json:"username"`
 	Password    string `json:"password"`
 }
+type UpdateAdminStatus struct {
+	Status string `json:"status" binding:"required,oneof=active inactive"`
+}
+type UpdateAdmin struct {
+	FirstName   string `json:"first_name"`
+	LastName    string `json:"last_name"`
+	Email       string `json:"email"`
+	PhoneNumber string `json:"phone_number"`
+	Username    string `json:"username"`
+	Password    string `json:"password"`
+}
