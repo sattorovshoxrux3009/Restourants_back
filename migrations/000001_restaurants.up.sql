@@ -73,5 +73,15 @@ CREATE TABLE IF NOT EXISTS `super_admins` (
     `last_login` TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS `admin_restaurant_limits` (
+    `id`              INT AUTO_INCREMENT PRIMARY KEY,
+    `admin_id`        INT UNSIGNED  NOT NULL,
+    `max_restaurants` INT NOT NULL DEFAULT 1, 
+    `created_at`      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    `updated_at`      TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (admin_id) REFERENCES admins(id) ON DELETE CASCADE
+);
+
+
 ALTER TABLE `restaurants` ADD CONSTRAINT `restaurants_owner_id_fk` FOREIGN KEY (`owner_id`) REFERENCES `admins`(`id`) ON DELETE CASCADE;
 

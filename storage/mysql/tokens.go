@@ -102,3 +102,27 @@ func (t *tokenRepo) Delete(ctx context.Context, id int) error {
 	}
 	return nil
 }
+
+func (t *tokenRepo) DeleteByAdminId(ctx context.Context, id int) error {
+	tx, err := t.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
+	query := `DELETE FROM tokens WHERE admin_id = ?`
+	_, err = tx.ExecContext(ctx, query, id)
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+	err = tx.Commit()
+	if err != nil {
+		return err
+	}
+	return nil
+}

@@ -9,6 +9,7 @@ type TokenStorageI interface {
 	Create(ctx context.Context, req *CreateToken) (*CreateToken, error)
 	GetByAdminId(ctx context.Context, id int) ([]Token, error)
 	Delete(ctx context.Context, id int) error
+	DeleteByAdminId(ctx context.Context, id int) error
 }
 
 type Token struct {

@@ -24,6 +24,9 @@ type CreateAdmin struct {
 type UpdateAdminStatus struct {
 	Status string `json:"status" binding:"required,oneof=active inactive"`
 }
+type UpdateAdminLimit struct {
+	Limit int `json:"limit" binding:"required"`
+}
 type UpdateAdmin struct {
 	FirstName   string `json:"first_name"`
 	LastName    string `json:"last_name"`

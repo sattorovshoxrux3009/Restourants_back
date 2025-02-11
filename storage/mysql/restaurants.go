@@ -319,52 +319,54 @@ func (r *restaurantsRepo) GetByOwnerId(ctx context.Context, id int) ([]repo.Rest
 	}
 	defer rows.Close()
 
-	var restourants []repo.Restaurant
+	var restaurants []repo.Restaurant
 
 	for rows.Next() {
-		var restourant repo.Restaurant
+		var restaurant repo.Restaurant
 		var createdAtStr, updatedAtStr string
 
 		err := rows.Scan(
-			&restourant.Id,
-			&restourant.Name,
-			&restourant.Address,
-			&restourant.Latitude,
-			&restourant.Longitude,
-			&restourant.PhoneNumber,
-			&restourant.Email,
-			&restourant.Capacity,
-			&restourant.OwnerID,
-			&restourant.OpeningHours,
-			&restourant.ImageURL,
-			&restourant.Description,
-			&restourant.AlcoholPermission,
+			&restaurant.Id,
+			&restaurant.Name,
+			&restaurant.Address,
+			&restaurant.Latitude,
+			&restaurant.Longitude,
+			&restaurant.PhoneNumber,
+			&restaurant.Email,
+			&restaurant.Capacity,
+			&restaurant.OwnerID,
+			&restaurant.OpeningHours,
+			&restaurant.ImageURL,
+			&restaurant.Description,
+			&restaurant.AlcoholPermission,
 			&createdAtStr,
 			&updatedAtStr,
-			&restourant.Status,
+			&restaurant.Status,
 		)
 		if err != nil {
 			return nil, err
 		}
 
 		// Time parsing
-		restourant.CreatedAt, err = time.Parse("2006-01-02 15:04:05", createdAtStr)
+		restaurant.CreatedAt, err = time.Parse("2006-01-02 15:04:05", createdAtStr)
 		if err != nil {
 			return nil, err
 		}
-		restourant.UpdatedAt, err = time.Parse("2006-01-02 15:04:05", updatedAtStr)
+		restaurant.UpdatedAt, err = time.Parse("2006-01-02 15:04:05", updatedAtStr)
 		if err != nil {
 			return nil, err
 		}
 
-		restourants = append(restourants, restourant)
+		restaurants = append(restaurants, restaurant)
 	}
-
+	if len(restaurants) == 0 {
+		return []repo.Restaurant{}, nil
+	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
 
-	return restourants, nil
+	return restaurants, nil
 }
 
 func (r *restaurantsRepo) GetById(ctx context.Context, id int) (*repo.Restaurant, error) {

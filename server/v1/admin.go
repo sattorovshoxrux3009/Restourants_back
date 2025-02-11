@@ -51,6 +51,25 @@ func (h *handlerV1) CreateAdmin(ctx *gin.Context) {
 		return
 	}
 
+	NewAdmin, err := h.strg.Admin().GetByUsername(ctx, req.Username)
+	if err != nil {
+		log.Println(err)
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Internal server error :(",
+		})
+		return
+	}
+	_, err = h.strg.AdminRestaurantsLimit().Create(ctx, &repo.CreateAdminRestaurantsLimit{
+		AdminId:        NewAdmin.Id,
+		MaxRestaurants: 1,
+	})
+	if err != nil {
+		log.Println(err)
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Internal server error :(",
+		})
+		return
+	}
 	ctx.JSON(http.StatusCreated, models.CreateAdmin{
 		Username: admin.Username,
 	})
@@ -147,9 +166,49 @@ func (h *handlerV1) UpdateAdminStatus(ctx *gin.Context) {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update admin status"})
 		return
 	}
-
+	err = h.strg.Token().DeleteByAdminId(ctx, admin.Id)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update admin status"})
+		return
+	}
 	// Yangilangan statusni va admin ma'lumotlarini yuborish
 	ctx.JSON(http.StatusOK, gin.H{"message": "Admin status updated successfully"})
+}
+
+func (h *handlerV1) UpdateAdminLimit(ctx *gin.Context) {
+	adminID := ctx.Param("id")
+	var requestBody models.UpdateAdminLimit
+
+	if err := ctx.ShouldBindJSON(&requestBody); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
+		return
+	}
+
+	id, err := strconv.Atoi(adminID)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid admin ID"})
+		return
+	}
+
+	admin, err := h.strg.Admin().GetById(ctx, id) // GetById funksiyasini ishlatamiz
+	if admin == nil || err != nil {
+		ctx.JSON(http.StatusNotFound, gin.H{"error": "Admin not found"})
+		return
+	}
+
+	// Limitni yangilash
+	err = h.strg.AdminRestaurantsLimit().Update(ctx, &repo.CreateAdminRestaurantsLimit{
+		AdminId:        id,
+		MaxRestaurants: requestBody.Limit,
+	})
+
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update admin limit"})
+		return
+	}
+
+	// Yangilangan statusni va admin ma'lumotlarini yuborish
+	ctx.JSON(http.StatusOK, gin.H{"message": "Admin limit updated successfully"})
 }
 
 func (h *handlerV1) UpdateAdmin(ctx *gin.Context) {
@@ -210,19 +269,28 @@ func (h *handlerV1) GetAdminDetails(ctx *gin.Context) {
 
 	admin, err := h.strg.Admin().GetById(ctx, intID)
 	if err != nil {
-		// Agar admin topilmasa, 404 statusi bilan javob qaytarish
 		ctx.JSON(http.StatusNotFound, gin.H{"error": "Admin not found"})
 		return
 	}
 	adminLogins, err := h.strg.Token().GetByAdminId(ctx, intID)
 	if err != nil {
-		// Agar loginslarni olishda xato bo'lsa, javob qaytarish
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Error fetching admin logins"})
+		return
+	}
+	restaurants, err := h.strg.Restaurants().GetByOwnerId(ctx, admin.Id)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Error fetching admin restourants"})
+		return
+	}
+	limits, err := h.strg.AdminRestaurantsLimit().GetByAdminId(ctx, admin.Id)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Error fetching admin limits"})
 		return
 	}
 	ctx.JSON(http.StatusOK, gin.H{
 		"admin":             admin,
 		"admin_logins":      adminLogins,
-		"admin_restourants": "",
+		"admin_restourants": restaurants,
+		"admin_limits":      limits,
 	})
 }
