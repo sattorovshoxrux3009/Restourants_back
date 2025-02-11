@@ -22,9 +22,13 @@ func NewServer(opts *Options) *gin.Engine {
 	handler := v1.New(&v1.HandlerV1{
 		Strg: opts.Strg,
 	})
+	router.Static("/uploads", "./uploads")
 
 	router.POST("/v1/create-s-admin", handler.CreateSuperAdmin)
 	router.POST("/v1/login", handler.Login)
+
+	router.GET("/v1/restaurants", handler.GetRestourants)
+	router.GET("/v1/restaurants/:id", handler.GetRestourants)
 
 	superAdmin := router.Group("/v1")
 	superAdmin.Use(handler.AuthMiddleware(), handler.SuperAdminMiddleware())
@@ -32,9 +36,12 @@ func NewServer(opts *Options) *gin.Engine {
 		superAdmin.GET("/admins", handler.GetAdmins)
 		superAdmin.GET("/admins/:id", handler.GetAdmins)
 		superAdmin.GET("/admins/:id/details", handler.GetAdminDetails)
+		superAdmin.GET("/s-restaurants", handler.GetSRestourants)
+		superAdmin.GET("/s-restaurants/:id", handler.GetSRestourants)
 		superAdmin.POST("/create-admin", handler.CreateAdmin)
 		superAdmin.PUT("/update-admin/:id/status", handler.UpdateAdminStatus)
 		superAdmin.PUT("/update-admin/:id", handler.UpdateAdmin)
+		superAdmin.POST("/create-restaurant", handler.CreateRestaurant)
 	}
 
 	admin := router.Group("/v1")

@@ -54,8 +54,10 @@ func (h *handlerV1) CreateSuperAdmin(ctx *gin.Context) {
 	}
 
 	superAdmin, err := h.strg.SuperAdmin().Create(ctx, &repo.CreateSuperAdmin{
-		Username: req.Username,
-		Password: string(hashedPassword),
+		FirstName: req.FirstName,
+		LastName:  req.LastName,
+		Username:  req.Username,
+		Password:  string(hashedPassword),
 	})
 	if err != nil {
 		log.Println(err)

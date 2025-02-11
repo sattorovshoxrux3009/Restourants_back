@@ -78,14 +78,6 @@ func (h *handlerV1) GetAdmins(ctx *gin.Context) {
 	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(ctx.DefaultQuery("limit", "10"))
 
-	// Sahifani 1 dan boshlash
-	if page < 1 {
-		page = 1
-	}
-	if limit < 1 {
-		limit = 10
-	}
-
 	// Query parametrlarini olish
 	status := ctx.Query("status")
 	firstname := ctx.Query("firstname")     // firstname qidiruvi
@@ -229,8 +221,8 @@ func (h *handlerV1) GetAdminDetails(ctx *gin.Context) {
 		return
 	}
 	ctx.JSON(http.StatusOK, gin.H{
-		"admin":        admin,
-		"admin_logins": adminLogins,
-		"admin_restourants":"",
+		"admin":             admin,
+		"admin_logins":      adminLogins,
+		"admin_restourants": "",
 	})
 }

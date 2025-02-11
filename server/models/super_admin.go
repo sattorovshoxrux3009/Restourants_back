@@ -4,6 +4,8 @@ import "time"
 
 type SuperAdmin struct {
 	Id        string    `json:"id"`
+	FirstName string    `json:"first_name"`
+	LastName  string    `json:"last_name"`
 	Username  string    `json:"username"`
 	Password  string    `json:"password"`
 	CreatedAt time.Time `json:"created_at"`
@@ -11,6 +13,8 @@ type SuperAdmin struct {
 	LastLogin time.Time `json:"last_login"`
 }
 type CreateSuperAdmin struct {
+	FirstName string    `json:"first_name"`
+	LastName  string    `json:"last_name"`
 	Username  string    `json:"username"`
 	Password  string    `json:"password"`
 	CreatedAt time.Time `json:"created_at"`

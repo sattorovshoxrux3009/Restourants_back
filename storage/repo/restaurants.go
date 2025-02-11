@@ -5,11 +5,13 @@ import (
 	"time"
 )
 
-type RestourantsI interface {
-	Create(ctx context.Context, req *CreateRestourant) (*CreateRestourant, error)
+type RestaurantsI interface {
+	Create(ctx context.Context, req *CreateRestaurant) (*CreateRestaurant, error)
+	GetAll(ctx context.Context, name, address, capacity, adlcohol_permission string, page, limit int) ([]Restaurant, int, int, error)
+	GetSall(ctx context.Context, status, name, address, capacity, adlcohol_permission string, page, limit int) ([]Restaurant, int, int, error)
 	GetByOwnerId(ctx context.Context, id int) ([]Restaurant, error)
 	GetById(ctx context.Context, id int) (*Restaurant, error)
-	Update(ctx context.Context, id int, req *UpdateRestourant) error
+	Update(ctx context.Context, id int, req *UpdateRestaurant) error
 	Delete(ctx context.Context, id int) error
 }
 
@@ -29,8 +31,9 @@ type Restaurant struct {
 	AlcoholPermission bool
 	CreatedAt         time.Time
 	UpdatedAt         time.Time
+	Status            string
 }
-type CreateRestourant struct {
+type CreateRestaurant struct {
 	Name              string
 	Address           string
 	Latitude          float64
@@ -44,7 +47,7 @@ type CreateRestourant struct {
 	Description       string
 	AlcoholPermission bool
 }
-type UpdateRestourant struct {
+type UpdateRestaurant struct {
 	Name              string
 	Address           string
 	Latitude          float64

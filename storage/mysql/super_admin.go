@@ -21,11 +21,13 @@ func NewSuperAdminStorage(db *sql.DB) repo.SuperAdminStorageI {
 func (s *superAdminRepo) Create(ctx context.Context, req *repo.CreateSuperAdmin) (*repo.CreateSuperAdmin, error) {
 	query := `
 		INSERT INTO super_admins (
+			first_name,
+			last_name,
 			username,
 			password
-		) VALUES (?, ?)
+		) VALUES (?, ?, ?, ?)
 	`
-	_, err := s.db.Exec(query, req.Username, req.Password)
+	_, err := s.db.Exec(query, req.FirstName, req.LastName, req.Username, req.Password)
 	if err != nil {
 		return nil, err
 	}
@@ -38,7 +40,7 @@ func (s *superAdminRepo) Create(ctx context.Context, req *repo.CreateSuperAdmin)
 func (s *superAdminRepo) GetByUsername(ctx context.Context, username string) (*repo.SuperAdmin, error) {
 	query := `
 		SELECT 
-			id, username,
+			id, first_name, last_name , username,
 			password, created_at, 
 			token, last_login
 		FROM super_admins WHERE username=?
@@ -48,6 +50,8 @@ func (s *superAdminRepo) GetByUsername(ctx context.Context, username string) (*r
 	var token sql.NullString
 	err := s.db.QueryRow(query, username).Scan(
 		&admin.Id,
+		&admin.FirstName,
+		&admin.LastName,
 		&admin.Username,
 		&admin.Password,
 		&createdAt,

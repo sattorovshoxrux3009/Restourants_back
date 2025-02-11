@@ -14,6 +14,8 @@ type SuperAdminStorageI interface {
 }
 type SuperAdmin struct {
 	Id        string
+	FirstName string
+	LastName  string
 	Username  string
 	Password  string
 	CreatedAt time.Time
@@ -21,6 +23,8 @@ type SuperAdmin struct {
 	LastLogin time.Time
 }
 type CreateSuperAdmin struct {
+	FirstName string
+	LastName  string
 	Username  string
 	Password  string
 	CreatedAt time.Time
