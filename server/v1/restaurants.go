@@ -204,3 +204,4 @@ func (h *handlerV1) GetSRestourants(ctx *gin.Context) {
 		"restaurants": restaurants,
 	})
 }
+
