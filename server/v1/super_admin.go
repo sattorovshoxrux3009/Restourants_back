@@ -25,7 +25,6 @@ func CreateJWTToken(username, role string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-
 	return tokenString, nil
 }
 

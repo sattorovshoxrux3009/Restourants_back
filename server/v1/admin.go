@@ -294,3 +294,25 @@ func (h *handlerV1) GetAdminDetails(ctx *gin.Context) {
 		"admin_limits":      limits,
 	})
 }
+
+func (h *handlerV1) DeleteAdmin(ctx *gin.Context) {
+	id := ctx.Param("id")
+
+	intID, err := strconv.Atoi(id)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
+		return
+	}
+
+	admin, err := h.strg.Admin().GetById(ctx, intID)
+	if err != nil || admin == nil {
+		ctx.JSON(http.StatusNotFound, gin.H{"error": "Admin not found"})
+		return
+	}
+	err = h.strg.Admin().DeleteById(ctx, intID)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Delete admin failed"})
+		return
+	}
+	ctx.JSON(http.StatusOK, gin.H{"message": "Admin deleted succsessfully!"})
+}
