@@ -8,10 +8,11 @@ import (
 type RestaurantsI interface {
 	Create(ctx context.Context, req *CreateRestaurant) (*CreateRestaurant, error)
 	GetAll(ctx context.Context, name, address, capacity, adlcohol_permission string, page, limit int) ([]Restaurant, int, int, error)
-	GetSall(ctx context.Context, status, name, address, capacity, adlcohol_permission string, page, limit int) ([]Restaurant, int, int, error)
+	GetSall(ctx context.Context, status, phonenumber, email, ownerid, name, address, capacity, alcohol_permission string, page, limit int) ([]Restaurant, int, int, error)
 	GetByOwnerId(ctx context.Context, id int) ([]Restaurant, error)
 	GetById(ctx context.Context, id int) (*Restaurant, error)
 	Update(ctx context.Context, id int, req *UpdateRestaurant) error
+	UpdateStatus(ctx context.Context, id int, status string) error
 	Delete(ctx context.Context, id int) error
 }
 

@@ -152,7 +152,7 @@ func (r *restaurantsRepo) GetAll(ctx context.Context, name, address, capacity, a
 }
 
 // for super admin
-func (r *restaurantsRepo) GetSall(ctx context.Context, status, name, address, capacity, adlcohol_permission string, page, limit int) ([]repo.Restaurant, int, int, error) {
+func (r *restaurantsRepo) GetSall(ctx context.Context, status, phonenumber, email, ownerid, name, address, capacity, alcohol_permission string, page, limit int) ([]repo.Restaurant, int, int, error) {
 	var total int
 	countQuery := `SELECT COUNT(*) FROM restaurants`
 	var args []interface{}
@@ -161,6 +161,33 @@ func (r *restaurantsRepo) GetSall(ctx context.Context, status, name, address, ca
 	if status != "" {
 		countQuery += " WHERE status = ?"
 		args = append(args, status)
+	}
+
+	if phonenumber != "" {
+		if len(args) > 0 {
+			countQuery += " AND phone_number LIKE ?"
+		} else {
+			countQuery += " WHERE phone_number LIKE ?"
+		}
+		args = append(args, "%"+phonenumber+"%")
+	}
+
+	if email != "" {
+		if len(args) > 0 {
+			countQuery += " AND email LIKE ?"
+		} else {
+			countQuery += " WHERE email LIKE ?"
+		}
+		args = append(args, "%"+email+"%")
+	}
+
+	if ownerid != "" {
+		if len(args) > 0 {
+			countQuery += " AND owner_id LIKE ?"
+		} else {
+			countQuery += " WHERE owner_id LIKE ?"
+		}
+		args = append(args, "%"+ownerid+"%")
 	}
 
 	if name != "" {
@@ -190,13 +217,13 @@ func (r *restaurantsRepo) GetSall(ctx context.Context, status, name, address, ca
 		args = append(args, "%"+capacity+"%")
 	}
 
-	if adlcohol_permission != "" {
+	if alcohol_permission != "" {
 		if len(args) > 0 {
-			countQuery += " AND adlcohol_permission LIKE ?"
+			countQuery += " AND alcohol_permission LIKE ?"
 		} else {
-			countQuery += " WHERE adlcohol_permission LIKE ?"
+			countQuery += " WHERE alcohol_permission LIKE ?"
 		}
-		args = append(args, "%"+adlcohol_permission+"%")
+		args = append(args, "%"+alcohol_permission+"%")
 	}
 
 	err := r.db.QueryRowContext(ctx, countQuery, args...).Scan(&total)
@@ -208,7 +235,7 @@ func (r *restaurantsRepo) GetSall(ctx context.Context, status, name, address, ca
 	totalPages := int(math.Ceil(float64(total) / float64(limit)))
 
 	// Adminlarni olish uchun so‘rov
-	query := `SELECT id, name, address, latitude, longitude, phone_number, email, capacity, owner_id, opening_hours, image_url, description, alcohol_permission 
+	query := `SELECT id, name, address, latitude, longitude, phone_number, email, capacity, owner_id, opening_hours, image_url, description, alcohol_permission, status 
 	          FROM restaurants`
 	args = nil // Fresh args list
 
@@ -216,6 +243,33 @@ func (r *restaurantsRepo) GetSall(ctx context.Context, status, name, address, ca
 	if status != "" {
 		query += " WHERE status = ?"
 		args = append(args, status)
+	}
+
+	if phonenumber != "" {
+		if len(args) > 0 {
+			query += " AND phone_number LIKE ?"
+		} else {
+			query += " WHERE phone_number LIKE ?"
+		}
+		args = append(args, "%"+phonenumber+"%")
+	}
+
+	if email != "" {
+		if len(args) > 0 {
+			query += " AND email LIKE ?"
+		} else {
+			query += " WHERE email LIKE ?"
+		}
+		args = append(args, "%"+email+"%")
+	}
+
+	if ownerid != "" {
+		if len(args) > 0 {
+			query += " AND owner_id LIKE ?"
+		} else {
+			query += " WHERE owner_id LIKE ?"
+		}
+		args = append(args, "%"+ownerid+"%")
 	}
 
 	if name != "" {
@@ -245,13 +299,13 @@ func (r *restaurantsRepo) GetSall(ctx context.Context, status, name, address, ca
 		args = append(args, "%"+capacity+"%")
 	}
 
-	if adlcohol_permission != "" {
+	if alcohol_permission != "" {
 		if len(args) > 0 {
-			query += " AND adlcohol_permission LIKE ?"
+			query += " AND alcohol_permission LIKE ?"
 		} else {
-			query += " WHERE adlcohol_permission LIKE ?"
+			query += " WHERE alcohol_permission LIKE ?"
 		}
-		args = append(args, "%"+adlcohol_permission+"%")
+		args = append(args, "%"+alcohol_permission+"%")
 	}
 
 	// Sahifani tartiblaymiz va limit qo‘shamiz
@@ -285,6 +339,7 @@ func (r *restaurantsRepo) GetSall(ctx context.Context, status, name, address, ca
 			&restaurant.ImageURL,
 			&restaurant.Description,
 			&restaurant.AlcoholPermission,
+			&restaurant.Status,
 		)
 		if err != nil {
 			return nil, 0, 0, err
@@ -453,6 +508,36 @@ func (r *restaurantsRepo) Update(ctx context.Context, id int, req *repo.UpdateRe
 		req.Email, req.Capacity, req.OwnerID,
 		req.OpeningHours, req.ImageURL,
 		req.Description, req.AlcoholPermission, id,
+	)
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (r *restaurantsRepo) UpdateStatus(ctx context.Context, id int, status string) error {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+	query := `
+		UPDATE restaurants SET 
+			status = ?
+		WHERE id = ?
+	`
+	_, err = tx.ExecContext(
+		ctx, query, status, id,
 	)
 	if err != nil {
 		tx.Rollback()

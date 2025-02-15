@@ -34,3 +34,7 @@ type CreateRestourants struct {
 	Description       string  `json:"description"`
 	AlcoholPermission bool    `json:"alcohol_permission"`
 }
+
+type UpdateRestaurantStatus struct {
+	Status string `json:"status"`
+}

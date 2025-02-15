@@ -42,6 +42,7 @@ func NewServer(opts *Options) *gin.Engine {
 		superAdmin.PUT("/update-admin/:id/status", handler.UpdateAdminStatus)
 		superAdmin.PUT("/update-admin/:id/limit", handler.UpdateAdminLimit)
 		superAdmin.PUT("/update-admin/:id", handler.UpdateAdmin)
+		superAdmin.PUT("/restaurants/:id/status",handler.UpdateRestaurantStatus)
 		superAdmin.POST("/create-restaurant", handler.CreateRestaurant)
 		superAdmin.DELETE("/admin/:id", handler.DeleteAdmin)
 	}

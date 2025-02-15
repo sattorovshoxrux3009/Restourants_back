@@ -179,23 +179,30 @@ func (h *handlerV1) GetSRestourants(ctx *gin.Context) {
 		limit = 10
 	}
 	status := ctx.Query("status")
+	phonenumber := ctx.Query("phonenumber")
+	email := ctx.Query("email")
+	ownerid := ctx.Query("ownerid")
 	name := ctx.Query("name")
 	address := ctx.Query("address")
 	capacity := ctx.Query("capacity")
-	adlcohol_permission := ctx.Query("adlcohol_permission")
+	adlcoholpermission := ctx.Query("alcoholpermission")
 
 	restaurants, currentPage, totalPage, err := h.strg.Restaurants().GetSall(
 		ctx,
 		status,
+		phonenumber,
+		email,
+		ownerid,
 		name,
 		address,
 		capacity,
-		adlcohol_permission,
+		adlcoholpermission,
 		page,
 		limit,
 	)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get restaurants"})
+		fmt.Println(err)
 		return
 	}
 	ctx.JSON(http.StatusOK, gin.H{
@@ -205,3 +212,31 @@ func (h *handlerV1) GetSRestourants(ctx *gin.Context) {
 	})
 }
 
+func (h *handlerV1) UpdateRestaurantStatus(ctx *gin.Context) {
+	restaurantID := ctx.Param("id")
+	if restaurantID == "" {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Restaurant ID is required"})
+		return
+	}
+	id, err := strconv.Atoi(restaurantID)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid restaurant ID"})
+		return
+	}
+	var requestBody models.UpdateRestaurantStatus
+	if err := ctx.ShouldBindJSON(&requestBody); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		return
+	}
+	restaurant, err := h.strg.Restaurants().GetById(ctx, id)
+	if err != nil || restaurant == nil {
+		ctx.JSON(http.StatusNotFound, gin.H{"error": "Restaurant not found"})
+		return
+	}
+	err = h.strg.Restaurants().UpdateStatus(ctx, id, requestBody.Status)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update restaurant status"})
+		return
+	}
+	ctx.JSON(http.StatusOK, gin.H{"message": "Restaurant status updated successfully"})
+}
