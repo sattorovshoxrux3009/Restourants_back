@@ -29,6 +29,8 @@ func NewServer(opts *Options) *gin.Engine {
 
 	router.GET("/v1/restaurants", handler.GetRestourants)
 	router.GET("/v1/restaurants/:id", handler.GetRestourants)
+	router.GET("/v1/menu", handler.GetMenu)
+	router.GET("/v1/menu/:id", handler.GetMenu)
 
 	superAdmin := router.Group("/v1")
 	superAdmin.Use(handler.AuthMiddleware(), handler.SuperAdminMiddleware())
@@ -38,11 +40,14 @@ func NewServer(opts *Options) *gin.Engine {
 		superAdmin.GET("/admins/:id/details", handler.GetAdminDetails)
 		superAdmin.GET("/s-restaurants", handler.GetSRestourants)
 		superAdmin.GET("/s-restaurants/:id", handler.GetSRestourants)
+		superAdmin.GET("/s-restaurants/:id/details", handler.GetSRestaurantDetails)
+		superAdmin.GET("/s-menu", handler.GetSMenu)
+		superAdmin.GET("/s-menu/:id", handler.GetSMenu)
 		superAdmin.POST("/create-admin", handler.CreateAdmin)
-		superAdmin.PUT("/update-admin/:id/status", handler.UpdateAdminStatus)
-		superAdmin.PUT("/update-admin/:id/limit", handler.UpdateAdminLimit)
+		superAdmin.POST("/s-menu", handler.CreateMenu)
 		superAdmin.PUT("/update-admin/:id", handler.UpdateAdmin)
-		superAdmin.PUT("/restaurants/:id/status",handler.UpdateRestaurantStatus)
+		superAdmin.PUT("/restaurants/:id/status", handler.UpdateRestaurantStatus)
+		superAdmin.PUT("/restaurants/:id", handler.UpdateRestaurant)
 		superAdmin.POST("/create-restaurant", handler.CreateRestaurant)
 		superAdmin.DELETE("/admin/:id", handler.DeleteAdmin)
 	}
@@ -50,7 +55,6 @@ func NewServer(opts *Options) *gin.Engine {
 	admin := router.Group("/v1")
 	admin.Use(handler.AuthMiddleware(), handler.AdminMiddleware())
 	{
-
 	}
 	return router
 }

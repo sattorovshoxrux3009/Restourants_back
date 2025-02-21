@@ -235,7 +235,7 @@ func (r *restaurantsRepo) GetSall(ctx context.Context, status, phonenumber, emai
 	totalPages := int(math.Ceil(float64(total) / float64(limit)))
 
 	// Adminlarni olish uchun so‘rov
-	query := `SELECT id, name, address, latitude, longitude, phone_number, email, capacity, owner_id, opening_hours, image_url, description, alcohol_permission, status 
+	query := `SELECT id, name, address, latitude, longitude, phone_number, email, capacity, owner_id, opening_hours, image_url, description, alcohol_permission, status ,created_at, updated_at
 	          FROM restaurants`
 	args = nil // Fresh args list
 
@@ -324,7 +324,7 @@ func (r *restaurantsRepo) GetSall(ctx context.Context, status, phonenumber, emai
 	// Natijalarni yig‘ish
 	for rows.Next() {
 		var restaurant repo.Restaurant
-
+		var createdAtStr,updatedAtstr string
 		err := rows.Scan(
 			&restaurant.Id,
 			&restaurant.Name,
@@ -340,7 +340,17 @@ func (r *restaurantsRepo) GetSall(ctx context.Context, status, phonenumber, emai
 			&restaurant.Description,
 			&restaurant.AlcoholPermission,
 			&restaurant.Status,
+			&createdAtStr,
+			&updatedAtstr,
 		)
+		if err != nil {
+			return nil, 0, 0, err
+		}
+		restaurant.CreatedAt, err = time.Parse("2006-01-02 15:04:05", createdAtStr)
+		if err != nil {
+			return nil, 0, 0, err
+		}
+		restaurant.UpdatedAt, err = time.Parse("2006-01-02 15:04:05", updatedAtstr)
 		if err != nil {
 			return nil, 0, 0, err
 		}
@@ -354,7 +364,7 @@ func (r *restaurantsRepo) GetSall(ctx context.Context, status, phonenumber, emai
 	return restaurants, page, totalPages, nil
 }
 
-func (r *restaurantsRepo) GetByOwnerId(ctx context.Context, id int) ([]repo.Restaurant, error) {
+func (r *restaurantsRepo) GetByOwnerId(ctx context.Context, id, limit int) ([]repo.Restaurant, error) {
 	query := `
 		SELECT 
 			id, name, address,
@@ -367,8 +377,9 @@ func (r *restaurantsRepo) GetByOwnerId(ctx context.Context, id int) ([]repo.Rest
 			status
 		FROM restaurants 
 		WHERE owner_id = ?
+		LIMIT ?
 	`
-	rows, err := r.db.QueryContext(ctx, query, id)
+	rows, err := r.db.QueryContext(ctx, query, id, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -414,9 +425,7 @@ func (r *restaurantsRepo) GetByOwnerId(ctx context.Context, id int) ([]repo.Rest
 
 		restaurants = append(restaurants, restaurant)
 	}
-	if len(restaurants) == 0 {
-		return []repo.Restaurant{}, nil
-	}
+
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}

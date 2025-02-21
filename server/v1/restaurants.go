@@ -52,7 +52,26 @@ func (h *handlerV1) CreateRestaurant(ctx *gin.Context) {
 		})
 		return
 	}
-
+	limit, err := h.strg.AdminRestaurantsLimit().GetByAdminId(ctx, req.OwnerID)
+	if err != nil || limit == nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"error": "Limit is not exists",
+		})
+		return
+	}
+	ownerRestaurants, err := h.strg.Restaurants().GetByOwnerId(ctx, req.OwnerID, limit.MaxRestaurants)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"error": "Error getting owner restourants for limit",
+		})
+		return
+	}
+	if len(ownerRestaurants) >= limit.MaxRestaurants {
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"error": "You have reached the maximum number of restaurants allowed.",
+		})
+		return
+	}
 	if err := ctx.ShouldBind(&req); err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{
 			"error": "Form-data error",
@@ -72,7 +91,7 @@ func (h *handlerV1) CreateRestaurant(ctx *gin.Context) {
 		req.Image = imageURL
 	}
 
-	restaurant, err := h.strg.Restaurants().Create(ctx, &repo.CreateRestaurant{
+	_, err = h.strg.Restaurants().Create(ctx, &repo.CreateRestaurant{
 		Name:              req.Name,
 		Address:           req.Address,
 		Latitude:          req.Latitude,
@@ -94,7 +113,9 @@ func (h *handlerV1) CreateRestaurant(ctx *gin.Context) {
 		return
 	}
 
-	ctx.JSON(http.StatusCreated, restaurant)
+	ctx.JSON(http.StatusCreated, gin.H{
+		"message": "Creating restaurant sucsessfully",
+	})
 }
 
 func (h *handlerV1) GetRestourants(ctx *gin.Context) {
@@ -239,4 +260,100 @@ func (h *handlerV1) UpdateRestaurantStatus(ctx *gin.Context) {
 		return
 	}
 	ctx.JSON(http.StatusOK, gin.H{"message": "Restaurant status updated successfully"})
+}
+
+func (h *handlerV1) UpdateRestaurant(ctx *gin.Context) {
+	restaurantID := ctx.Param("id")
+	if restaurantID == "" {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Restaurant ID is required"})
+		return
+	}
+
+	id, err := strconv.Atoi(restaurantID)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid restaurant ID"})
+		return
+	}
+
+	// Restoranni bazadan olish
+	restaurant, err := h.strg.Restaurants().GetById(ctx, id)
+	if err != nil || restaurant == nil {
+		ctx.JSON(http.StatusNotFound, gin.H{"error": "Restaurant not found"})
+		return
+	}
+
+	// Form-data dan ma'lumotlarni olish
+	var req models.UpdateRestaurants
+	req.Name = ctx.PostForm("name")
+	req.Address = ctx.PostForm("address")
+	req.Latitude, _ = strconv.ParseFloat(ctx.PostForm("latitude"), 64)
+	req.Longitude, _ = strconv.ParseFloat(ctx.PostForm("longitude"), 64)
+	req.PhoneNumber = ctx.PostForm("phone_number")
+	req.Email = ctx.PostForm("email")
+	req.Capacity, _ = strconv.Atoi(ctx.PostForm("capacity"))
+	req.OwnerID, _ = strconv.Atoi(ctx.PostForm("owner_id"))
+	req.OpeningHours = ctx.PostForm("opening_hours")
+	req.Description = ctx.PostForm("description")
+	req.AlcoholPermission, _ = strconv.ParseBool(ctx.PostForm("alcohol_permission"))
+
+	// Yangi rasm bor yoki yo‘qligini tekshirish
+	file, _ := ctx.FormFile("image")
+	if file != nil {
+		// Eskisini o‘chirish
+		if restaurant.ImageURL != "" {
+			oldImagePath := filepath.Join("uploads", "restourants", filepath.Base(restaurant.ImageURL))
+			_ = os.Remove(oldImagePath) // Eskisini o‘chirish
+		}
+
+		// Yangi rasmni saqlash
+		imageURL, err := saveImage(ctx, file)
+		if err != nil {
+			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Error saving new image"})
+			return
+		}
+		req.ImageURL = imageURL
+	} else {
+		req.ImageURL = restaurant.ImageURL // Agar yangi rasm kelmasa, eski rasmni saqlaymiz
+	}
+
+	// Ma'lumotlarni yangilash
+	err = h.strg.Restaurants().Update(ctx, id, &repo.UpdateRestaurant{
+		Name:              req.Name,
+		Address:           req.Address,
+		Latitude:          req.Latitude,
+		Longitude:         req.Longitude,
+		PhoneNumber:       req.PhoneNumber,
+		Email:             req.Email,
+		Capacity:          req.Capacity,
+		OwnerID:           req.OwnerID,
+		OpeningHours:      req.OpeningHours,
+		ImageURL:          req.ImageURL,
+		Description:       req.Description,
+		AlcoholPermission: req.AlcoholPermission,
+	})
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update restaurant"})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{"message": "Restaurant updated successfully"})
+}
+
+func (h *handlerV1) GetSRestaurantDetails(ctx *gin.Context) {
+	restaurantID := ctx.Param("id")
+	id, err := strconv.Atoi(restaurantID)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid restaurant ID"})
+		return
+	}
+
+	restaurant, err := h.strg.Restaurants().GetById(ctx, id)
+	if err != nil || restaurant == nil {
+		ctx.JSON(http.StatusNotFound, gin.H{"error": "Restaurant not found"})
+		return
+	}
+	ctx.JSON(http.StatusOK, gin.H{
+		"restaurant": restaurant,
+		// "restaurant_menu":   adminLogins,
+	})
 }

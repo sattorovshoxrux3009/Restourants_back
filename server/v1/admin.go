@@ -136,126 +136,97 @@ func (h *handlerV1) GetAdmins(ctx *gin.Context) {
 	})
 }
 
-func (h *handlerV1) UpdateAdminStatus(ctx *gin.Context) {
-	adminID := ctx.Param("id") // URL parametri orqali admin ID
-	var requestBody models.UpdateAdminStatus
-
-	// JSON ma'lumotlarini bind qilish
-	if err := ctx.ShouldBindJSON(&requestBody); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
-		return
-	}
-
-	// IDni integerga o'zgartirish
-	id, err := strconv.Atoi(adminID)
-	if err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid admin ID"})
-		return
-	}
-
-	// Adminni topish
-	admin, err := h.strg.Admin().GetById(ctx, id) // GetById funksiyasini ishlatamiz
-	if admin == nil || err != nil {
-		ctx.JSON(http.StatusNotFound, gin.H{"error": "Admin not found"})
-		return
-	}
-
-	// Statusni yangilash
-	err = h.strg.Admin().UpdateStatus(ctx, id, requestBody.Status)
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update admin status"})
-		return
-	}
-	err = h.strg.Token().DeleteByAdminId(ctx, admin.Id)
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update admin status"})
-		return
-	}
-	// Yangilangan statusni va admin ma'lumotlarini yuborish
-	ctx.JSON(http.StatusOK, gin.H{"message": "Admin status updated successfully"})
-}
-
-func (h *handlerV1) UpdateAdminLimit(ctx *gin.Context) {
-	adminID := ctx.Param("id")
-	var requestBody models.UpdateAdminLimit
-
-	if err := ctx.ShouldBindJSON(&requestBody); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
-		return
-	}
-
-	id, err := strconv.Atoi(adminID)
-	if err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid admin ID"})
-		return
-	}
-
-	admin, err := h.strg.Admin().GetById(ctx, id) // GetById funksiyasini ishlatamiz
-	if admin == nil || err != nil {
-		ctx.JSON(http.StatusNotFound, gin.H{"error": "Admin not found"})
-		return
-	}
-
-	// Limitni yangilash
-	err = h.strg.AdminRestaurantsLimit().Update(ctx, &repo.CreateAdminRestaurantsLimit{
-		AdminId:        id,
-		MaxRestaurants: requestBody.Limit,
-	})
-
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update admin limit"})
-		return
-	}
-
-	// Yangilangan statusni va admin ma'lumotlarini yuborish
-	ctx.JSON(http.StatusOK, gin.H{"message": "Admin limit updated successfully"})
-}
-
 func (h *handlerV1) UpdateAdmin(ctx *gin.Context) {
 	adminID := ctx.Param("id")
-	var requestBody models.UpdateAdmin
+	field := ctx.Query("field") // "status", "limit" yoki umumiy yangilash
+
+	var requestBody map[string]interface{}
 	if err := ctx.ShouldBindJSON(&requestBody); err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
 		return
 	}
+
 	id, err := strconv.Atoi(adminID)
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid admin ID"})
 		return
 	}
-	admin, err := h.strg.Admin().GetById(ctx, id) // GetById funksiyasini ishlatamiz
+
+	admin, err := h.strg.Admin().GetById(ctx, id)
 	if admin == nil || err != nil {
 		ctx.JSON(http.StatusNotFound, gin.H{"error": "Admin not found"})
 		return
 	}
-	var hashedPassword []byte
-	if requestBody.Password != "" {
-		hashedPassword, err = bcrypt.GenerateFromPassword([]byte(requestBody.Password), bcrypt.DefaultCost)
-		if err != nil {
-			ctx.JSON(http.StatusInternalServerError, gin.H{"error": err})
+
+	switch field {
+	case "status":
+		status, ok := requestBody["status"].(string)
+		if !ok {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid status format"})
 			return
 		}
-	}
-	hashedPasswordStr := string(hashedPassword)
-
-	updateData := &repo.UpdateAdmin{
-		FirstName:    requestBody.FirstName,
-		LastName:     requestBody.LastName,
-		Email:        requestBody.Email,
-		PhoneNumber:  requestBody.PhoneNumber,
-		Username:     requestBody.Username,
-		PasswordHash: hashedPasswordStr,
-	}
-
-	// Adminni yangilash
-	err = h.strg.Admin().Update(ctx, id, updateData)
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "err"})
+		if err := h.strg.Admin().UpdateStatus(ctx, id, status); err != nil {
+			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update admin status"})
+			return
+		}
+		if err := h.strg.Token().DeleteByAdminId(ctx, admin.Id); err != nil {
+			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to revoke admin tokens"})
+			return
+		}
+		ctx.JSON(http.StatusOK, gin.H{"message": "Admin status updated successfully"})
 		return
-	}
 
-	// Yangilangan statusni va admin ma'lumotlarini yuborish
-	ctx.JSON(http.StatusOK, gin.H{"message": "Admin updated successfully"})
+	case "limit":
+		limit, ok := requestBody["limit"].(float64)
+		if !ok {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid limit format"})
+			return
+		}
+		err := h.strg.AdminRestaurantsLimit().Update(ctx, &repo.CreateAdminRestaurantsLimit{
+			AdminId:        id,
+			MaxRestaurants: int(limit),
+		})
+		if err != nil {
+			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update admin limit"})
+			return
+		}
+		ctx.JSON(http.StatusOK, gin.H{"message": "Admin limit updated successfully"})
+		return
+
+	default:
+		// To'liq admin ma'lumotlarini yangilash
+		var updateData repo.UpdateAdmin
+		if firstName, ok := requestBody["first_name"].(string); ok {
+			updateData.FirstName = firstName
+		}
+		if lastName, ok := requestBody["last_name"].(string); ok {
+			updateData.LastName = lastName
+		}
+		if email, ok := requestBody["email"].(string); ok {
+			updateData.Email = email
+		}
+		if phoneNumber, ok := requestBody["phone_number"].(string); ok {
+			updateData.PhoneNumber = phoneNumber
+		}
+		if username, ok := requestBody["username"].(string); ok {
+			updateData.Username = username
+		}
+		if password, ok := requestBody["password"].(string); ok && password != "" {
+			hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+			if err != nil {
+				ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash password"})
+				return
+			}
+			updateData.PasswordHash = string(hashedPassword)
+		}
+
+		if err := h.strg.Admin().Update(ctx, id, &updateData); err != nil {
+			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update admin"})
+			return
+		}
+
+		ctx.JSON(http.StatusOK, gin.H{"message": "Admin updated successfully"})
+	}
 }
 
 func (h *handlerV1) GetAdminDetails(ctx *gin.Context) {
@@ -277,7 +248,14 @@ func (h *handlerV1) GetAdminDetails(ctx *gin.Context) {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Error fetching admin logins"})
 		return
 	}
-	restaurants, err := h.strg.Restaurants().GetByOwnerId(ctx, admin.Id)
+	limit, err := h.strg.AdminRestaurantsLimit().GetByAdminId(ctx, intID)
+	if err != nil || limit == nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"error": "Limit is not exists",
+		})
+		return
+	}
+	restaurants, err := h.strg.Restaurants().GetByOwnerId(ctx, admin.Id, limit.MaxRestaurants)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Error fetching admin restourants"})
 		return
