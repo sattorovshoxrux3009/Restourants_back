@@ -86,12 +86,15 @@ func (h *handlerV1) Login(ctx *gin.Context) {
 	var hashedPassword string
 	var username string
 	var adminId int
+	var FirstName, LastName string
 	// 1. SuperAdmin jadvalidan tekshirish
 	superAdmin, err := h.strg.SuperAdmin().GetByUsername(context.TODO(), req.Username)
 	if err == nil && superAdmin != nil {
 		role = "super_admin"
 		hashedPassword = superAdmin.Password
 		username = superAdmin.Username
+		FirstName = superAdmin.FirstName
+		LastName = superAdmin.LastName
 	} else {
 		// 2. Admin jadvalidan tekshirish
 		admin, err := h.strg.Admin().GetByUsername(context.TODO(), req.Username)
@@ -100,6 +103,8 @@ func (h *handlerV1) Login(ctx *gin.Context) {
 			hashedPassword = admin.PasswordHash
 			username = admin.Username
 			adminId = admin.Id
+			FirstName = admin.FirstName
+			LastName = admin.LastName
 		} else {
 			// 3. Ikkalasida ham topilmasa, xato qaytarish
 			ctx.JSON(http.StatusUnauthorized, gin.H{
@@ -184,5 +189,6 @@ func (h *handlerV1) Login(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, gin.H{
 		"token": token,
 		"role":  role,
+		"name":  FirstName + " " + LastName,
 	})
 }
