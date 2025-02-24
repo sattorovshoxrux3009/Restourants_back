@@ -237,8 +237,6 @@ func (m *menuRepo) GetSAll(ctx context.Context, name, category string, restauran
 	return menus, page, totalPages, nil
 }
 
-
-
 func (m *menuRepo) GetById(ctx context.Context, id int) (*repo.Menu, error) {
 	query := `SELECT id, restaurant_id, name, description, price, category, image_url, created_at, updated_at 
 	          FROM menu 
@@ -273,3 +271,62 @@ func (m *menuRepo) GetById(ctx context.Context, id int) (*repo.Menu, error) {
 	return &menu, nil
 }
 
+func (m *menuRepo) Update(ctx context.Context, id int, req *repo.CreateMenu) (*repo.CreateMenu, error) {
+	// Tranzaksiyani boshlash
+	tx, err := m.db.Begin()
+	if err != nil {
+		return nil, err
+	}
+
+	// Agar xatolik bo‘lsa, tranzaksiyani bekor qilish (rollback)
+	defer func() {
+		if err != nil {
+			tx.Rollback()
+		}
+	}()
+
+	query := `UPDATE menu 
+	          SET name = ?, description = ?, price = ?, category = ?, image_url = ? 
+	          WHERE id = ?`
+
+	_, err = tx.Exec(query, req.Name, req.Description, req.Price, req.Category, req.ImageURL, id)
+	if err != nil {
+		return nil, err
+	}
+
+	// Agar hammasi yaxshi bo‘lsa, tranzaksiyani tasdiqlash (commit)
+	err = tx.Commit()
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+func (m *menuRepo) Delete(ctx context.Context, id int) error {
+	
+	tx, err := m.db.Begin()
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if err != nil {
+			tx.Rollback()
+		}
+	}()
+
+	query := `DELETE FROM menu WHERE id = ?`
+
+	_, err = tx.Exec(query, id)
+	if err != nil {
+		return err
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}

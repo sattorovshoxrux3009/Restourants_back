@@ -315,8 +315,6 @@ func (h *handlerV1) UpdateRestaurant(ctx *gin.Context) {
 	} else {
 		req.ImageURL = restaurant.ImageURL // Agar yangi rasm kelmasa, eski rasmni saqlaymiz
 	}
-
-	// Ma'lumotlarni yangilash
 	err = h.strg.Restaurants().Update(ctx, id, &repo.UpdateRestaurant{
 		Name:              req.Name,
 		Address:           req.Address,

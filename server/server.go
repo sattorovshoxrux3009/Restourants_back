@@ -44,13 +44,15 @@ func NewServer(opts *Options) *gin.Engine {
 		superAdmin.GET("/s-menu", handler.GetSMenu)
 		superAdmin.GET("/s-menu/:id", handler.GetSMenu)
 		superAdmin.POST("/create-admin", handler.CreateAdmin)
-		superAdmin.POST("/s-menu", handler.CreateMenu)
+		superAdmin.POST("/s-menu", handler.CreateSMenu)
 		superAdmin.PUT("/update-admin/:id", handler.UpdateAdmin)
 		superAdmin.PUT("/restaurants/:id/status", handler.UpdateRestaurantStatus)
 		superAdmin.PUT("/restaurants/:id", handler.UpdateRestaurant)
+		superAdmin.PUT("/s-menu/:id", handler.UpdateSMenu)
 		superAdmin.POST("/create-restaurant", handler.CreateRestaurant)
 		superAdmin.DELETE("/admin/:id", handler.DeleteAdmin)
 		superAdmin.DELETE("/restaurants/:id", handler.DeleteRastaurant)
+		superAdmin.DELETE("/s-menu/:id", handler.DeleteSMenu)
 	}
 
 	admin := router.Group("/v1")
