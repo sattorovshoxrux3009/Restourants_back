@@ -126,13 +126,13 @@ func (m *menuRepo) GetAll(ctx context.Context, name, category string, page, limi
 }
 
 // for super admin
-func (m *menuRepo) GetSAll(ctx context.Context, name, category string, page, limit int) ([]repo.Menu, int, int, error) {
+func (m *menuRepo) GetSAll(ctx context.Context, name, category string, restaurant_id, page, limit int) ([]repo.MenuWithStatus, int, int, error) {
 	var total int
 	countQuery := `
 		SELECT COUNT(*) 
         FROM menu m 
-        JOIN restaurants r ON m.restaurant_id = r.id 
-        WHERE r.status = 'active'
+        JOIN restaurants r ON m.restaurant_id = r.id
+        WHERE 1=1
 	`
 	var args []interface{}
 
@@ -146,6 +146,11 @@ func (m *menuRepo) GetSAll(ctx context.Context, name, category string, page, lim
 		args = append(args, "%"+category+"%")
 	}
 
+	if restaurant_id != 0 {
+		countQuery += " AND m.restaurant_id = ?"
+		args = append(args, restaurant_id)
+	}
+
 	// Umumiy natijalarni olish
 	err := m.db.QueryRowContext(ctx, countQuery, args...).Scan(&total)
 	if err != nil {
@@ -156,10 +161,13 @@ func (m *menuRepo) GetSAll(ctx context.Context, name, category string, page, lim
 	totalPages := int(math.Ceil(float64(total) / float64(limit)))
 
 	// Ma'lumotlarni olish uchun so‘rov
-	query := `SELECT m.id, m.restaurant_id, m.name, m.description, m.price, m.category, m.image_url, m.created_at, m.updated_at
-              FROM menu m
-              JOIN restaurants r ON m.restaurant_id = r.id
-              WHERE r.status = 'active'`
+	query := `
+		SELECT m.id, m.restaurant_id, m.name, m.description, m.price, m.category, m.image_url, m.created_at, m.updated_at, 
+		       r.status 
+		FROM menu m
+		JOIN restaurants r ON m.restaurant_id = r.id
+		WHERE 1=1
+	`
 	args = nil // Yangi argumentlar ro‘yxati
 
 	// Filtrlarni qo‘shish
@@ -173,6 +181,11 @@ func (m *menuRepo) GetSAll(ctx context.Context, name, category string, page, lim
 		args = append(args, "%"+category+"%")
 	}
 
+	if restaurant_id != 0 {
+		query += " AND m.restaurant_id = ?"
+		args = append(args, restaurant_id)
+	}
+
 	// Sahifalash va tartiblash
 	query += " ORDER BY m.id ASC LIMIT ? OFFSET ?"
 	args = append(args, limit, (page-1)*limit)
@@ -184,11 +197,11 @@ func (m *menuRepo) GetSAll(ctx context.Context, name, category string, page, lim
 	}
 	defer rows.Close()
 
-	var menus []repo.Menu
+	var menus []repo.MenuWithStatus
 
 	for rows.Next() {
-		var menu repo.Menu
-		var createdAtStr, updatedAtStr string
+		var menu repo.MenuWithStatus
+		var createdAtStr, updatedAtStr, restaurantStatus string
 		err := rows.Scan(
 			&menu.Id,
 			&menu.RestaurantId,
@@ -199,12 +212,21 @@ func (m *menuRepo) GetSAll(ctx context.Context, name, category string, page, lim
 			&menu.ImageURL,
 			&createdAtStr,
 			&updatedAtStr,
+			&restaurantStatus,
 		)
 		if err != nil {
 			return nil, 0, 0, err
 		}
 		menu.CreatedAt, _ = time.Parse("2006-01-02 15:04:05", createdAtStr)
 		menu.UpdatedAt, _ = time.Parse("2006-01-02 15:04:05", updatedAtStr)
+
+		// Restaurant statusi bo'yicha menyu statusini belgilash
+		if restaurantStatus == "active" {
+			menu.Status = "active"
+		} else {
+			menu.Status = "inactive"
+		}
+
 		menus = append(menus, menu)
 	}
 
@@ -214,6 +236,8 @@ func (m *menuRepo) GetSAll(ctx context.Context, name, category string, page, lim
 
 	return menus, page, totalPages, nil
 }
+
+
 
 func (m *menuRepo) GetById(ctx context.Context, id int) (*repo.Menu, error) {
 	query := `SELECT id, restaurant_id, name, description, price, category, image_url, created_at, updated_at 

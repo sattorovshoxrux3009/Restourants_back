@@ -50,6 +50,7 @@ func NewServer(opts *Options) *gin.Engine {
 		superAdmin.PUT("/restaurants/:id", handler.UpdateRestaurant)
 		superAdmin.POST("/create-restaurant", handler.CreateRestaurant)
 		superAdmin.DELETE("/admin/:id", handler.DeleteAdmin)
+		superAdmin.DELETE("/restaurants/:id", handler.DeleteRastaurant)
 	}
 
 	admin := router.Group("/v1")

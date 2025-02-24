@@ -168,14 +168,26 @@ func (h *handlerV1) GetSMenu(ctx *gin.Context) {
 	}
 	name := ctx.Query("name")
 	category := ctx.Query("category")
-
+	restaurantIDStr := ctx.Query("restaurantid")
+	
+	var restaurantID int
+	if restaurantIDStr != "" {
+		var err error
+		restaurantID, err = strconv.Atoi(restaurantIDStr) 
+		if err != nil {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": "restaurantid must be an integer"})
+			return
+		}
+	}
 	menu, currentPage, totalPage, err := h.strg.Menu().GetSAll(
 		ctx,
 		name,
 		category,
+		restaurantID, 
 		page,
 		limit,
 	)
+
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get menus"})
 		return

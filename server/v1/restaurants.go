@@ -357,3 +357,35 @@ func (h *handlerV1) GetSRestaurantDetails(ctx *gin.Context) {
 		// "restaurant_menu":   adminLogins,
 	})
 }
+func (h *handlerV1) DeleteRastaurant(ctx *gin.Context) {
+	restaurantID := ctx.Param("id")
+	if restaurantID == "" {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Restaurant ID is required"})
+		return
+	}
+
+	id, err := strconv.Atoi(restaurantID)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid restaurant ID"})
+		return
+	}
+
+	restaurant, err := h.strg.Restaurants().GetById(ctx, id)
+	if err != nil || restaurant == nil {
+		ctx.JSON(http.StatusNotFound, gin.H{"error": "Restaurant not found"})
+		return
+	}
+
+	if restaurant.ImageURL != "" {
+		oldImagePath := filepath.Join("uploads", "restourants", filepath.Base(restaurant.ImageURL))
+		_ = os.Remove(oldImagePath)
+	}
+
+	err = h.strg.Restaurants().Delete(ctx, id)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete restaurant"})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{"message": "Restaurant deleted successfully"})
+}
