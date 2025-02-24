@@ -284,6 +284,11 @@ func (h *handlerV1) DeleteSMenu(ctx *gin.Context) {
 		return
 	}
 
+	if menu.ImageURL != "" {
+		oldImagePath := filepath.Join("uploads", "menu", filepath.Base(menu.ImageURL))
+		_ = os.Remove(oldImagePath)
+	}
+
 	err = h.strg.Menu().Delete(ctx, id)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})

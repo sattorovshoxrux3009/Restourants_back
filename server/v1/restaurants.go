@@ -355,6 +355,7 @@ func (h *handlerV1) GetSRestaurantDetails(ctx *gin.Context) {
 		// "restaurant_menu":   adminLogins,
 	})
 }
+
 func (h *handlerV1) DeleteRastaurant(ctx *gin.Context) {
 	restaurantID := ctx.Param("id")
 	if restaurantID == "" {
