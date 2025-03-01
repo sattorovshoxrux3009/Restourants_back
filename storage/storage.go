@@ -14,6 +14,7 @@ type StorageI interface {
 	Restaurants() repo.RestaurantsI
 	AdminRestaurantsLimit() repo.AdminRestaurantsLimitI
 	Menu() repo.MenuI
+	EventPrices() repo.EventPricesI
 }
 type storagePg struct {
 	superAdminRepo            repo.SuperAdminStorageI
@@ -22,6 +23,7 @@ type storagePg struct {
 	restaurantsRepo           repo.RestaurantsI
 	adminRestaurantsLimitRepo repo.AdminRestaurantsLimitI
 	menuRepo                  repo.MenuI
+	eventPricesRepo           repo.EventPricesI
 }
 
 func NewStorage(mysqlConn *sql.DB) StorageI {
@@ -32,6 +34,7 @@ func NewStorage(mysqlConn *sql.DB) StorageI {
 		restaurantsRepo:           mysql.NewRestaurantsStorage(mysqlConn),
 		adminRestaurantsLimitRepo: mysql.NewAdminRestaurantsLimitStorage(mysqlConn),
 		menuRepo:                  mysql.NewMenuStorage(mysqlConn),
+		eventPricesRepo:           mysql.NewEventPricesStorage(mysqlConn),
 	}
 }
 func (s *storagePg) SuperAdmin() repo.SuperAdminStorageI {
@@ -51,4 +54,7 @@ func (s *storagePg) AdminRestaurantsLimit() repo.AdminRestaurantsLimitI {
 }
 func (s *storagePg) Menu() repo.MenuI {
 	return s.menuRepo
+}
+func (s *storagePg) EventPrices() repo.EventPricesI {
+	return s.eventPricesRepo
 }

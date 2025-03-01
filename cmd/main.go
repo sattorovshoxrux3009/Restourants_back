@@ -42,7 +42,15 @@ func main() {
 		Strg: strg,
 	})
 
-	if err = router.Run(cfg.Port); err != nil {
+	if err := router.Listen(cfg.Port); err != nil {
 		log.Fatal("Error starting server: ", err)
 	}
+
+	// router := server.NewServer(&server.Options{
+	// 	Strg: strg,
+	// })
+
+	// if err = router.Run(cfg.Port); err != nil {
+	// 	log.Fatal("Error starting server: ", err)
+	// }
 }

@@ -23,3 +23,9 @@ type LoginAdmin struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
 }
+type UpdateSuperAdmin struct {
+	FirstName   string `json:"first_name"`
+	LastName    string `json:"last_name"`
+	OldPassword string `json:"old_password"`
+	NewPassword string `json:"new_password"`
+}

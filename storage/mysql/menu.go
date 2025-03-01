@@ -271,6 +271,53 @@ func (m *menuRepo) GetById(ctx context.Context, id int) (*repo.Menu, error) {
 	return &menu, nil
 }
 
+func (m *menuRepo) GetByRestourantId(ctx context.Context, id int) ([]*repo.Menu, error) {
+	query := `SELECT id, restaurant_id, name, description, price, category, image_url, created_at, updated_at 
+	          FROM menu 
+	          WHERE restaurant_id = ?`
+
+	rows, err := m.db.QueryContext(ctx, query, id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var menus []*repo.Menu
+
+	for rows.Next() {
+		var menu repo.Menu
+		var createdAtStr, updatedAtStr string
+
+		err := rows.Scan(
+			&menu.Id,
+			&menu.RestaurantId,
+			&menu.Name,
+			&menu.Description,
+			&menu.Price,
+			&menu.Category,
+			&menu.ImageURL,
+			&createdAtStr,
+			&updatedAtStr,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		// Vaqt formatini pars qilish
+		menu.CreatedAt, _ = time.Parse("2006-01-02 15:04:05", createdAtStr)
+		menu.UpdatedAt, _ = time.Parse("2006-01-02 15:04:05", updatedAtStr)
+
+		menus = append(menus, &menu)
+	}
+
+	// Agar menyu topilmasa, nil qaytaramiz
+	if len(menus) == 0 {
+		return nil, nil
+	}
+
+	return menus, nil
+}
+
 func (m *menuRepo) Update(ctx context.Context, id int, req *repo.CreateMenu) (*repo.CreateMenu, error) {
 	// Tranzaksiyani boshlash
 	tx, err := m.db.Begin()
@@ -304,7 +351,7 @@ func (m *menuRepo) Update(ctx context.Context, id int, req *repo.CreateMenu) (*r
 }
 
 func (m *menuRepo) Delete(ctx context.Context, id int) error {
-	
+
 	tx, err := m.db.Begin()
 	if err != nil {
 		return err

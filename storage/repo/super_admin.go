@@ -9,6 +9,7 @@ type SuperAdminStorageI interface {
 	Create(ctx context.Context, req *CreateSuperAdmin) (*CreateSuperAdmin, error)
 	GetByUsername(ctx context.Context, username string) (*SuperAdmin, error)
 	GetToken(ctx context.Context, username string) (string, error)
+	Update(ctx context.Context, req *SuperAdmin) error
 	UpdatePassword(ctx context.Context, username, password string) error
 	UpdateToken(ctx context.Context, username, token string) error
 }

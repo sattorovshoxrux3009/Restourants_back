@@ -103,6 +103,37 @@ func (s *superAdminRepo) GetToken(ctx context.Context, username string) (string,
 	}
 }
 
+func (s *superAdminRepo) Update(ctx context.Context, req *repo.SuperAdmin) error {
+	tsx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	query := `
+		UPDATE super_admins SET 
+			first_name=?,
+			last_name=?,
+			password=?
+		WHERE username=?
+	`
+	_, err = tsx.Exec(query, req.FirstName, req.LastName, req.Password, req.Username)
+	if err != nil {
+		errRoll := tsx.Rollback()
+		if errRoll != nil {
+			return errRoll
+		}
+		return err
+	}
+	err = tsx.Commit()
+	if err != nil {
+		errRoll := tsx.Rollback()
+		if errRoll != nil {
+			return errRoll
+		}
+		return err
+	}
+	return nil
+}
+
 func (s *superAdminRepo) UpdatePassword(ctx context.Context, username, password string) error {
 	tsx, err := s.db.Begin()
 	if err != nil {

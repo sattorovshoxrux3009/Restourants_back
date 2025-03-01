@@ -10,6 +10,7 @@ type MenuI interface {
 	GetAll(ctx context.Context, name, category string, page, limit int) ([]Menu, int, int, error)
 	GetSAll(ctx context.Context, name, category string, restaurant_id, page, limit int) ([]MenuWithStatus, int, int, error)
 	GetById(ctx context.Context, id int) (*Menu, error)
+	GetByRestourantId(ctx context.Context, id int) ([]*Menu, error)
 	Update(ctx context.Context, id int, req *CreateMenu) (*CreateMenu, error)
 	Delete(ctx context.Context, id int) error
 }

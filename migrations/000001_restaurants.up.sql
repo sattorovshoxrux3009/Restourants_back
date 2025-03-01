@@ -33,13 +33,14 @@ CREATE TABLE IF NOT EXISTS `event_prices` (
     `id` INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
     `restaurant_id` INT UNSIGNED NOT NULL,
     `event_type` ENUM('morning', 'night') NOT NULL,
-    `table_price` DECIMAL(8, 2) NOT NULL,
-    `waiter_price` DECIMAL(8, 2) NOT NULL,
+    `table_price` DECIMAL(12, 2) NOT NULL,
+    `waiter_price` DECIMAL(12, 2) NOT NULL,
     `max_guests` INT NOT NULL,
     `table_seats` INT NOT NULL,
     `max_waiters` INT NOT NULL,
     `alcohol_permission` BOOLEAN NOT NULL,
-    FOREIGN KEY (`restaurant_id`) REFERENCES `Restaurants`(`id`) ON DELETE CASCADE
+    FOREIGN KEY (`restaurant_id`) REFERENCES `Restaurants`(`id`) ON DELETE CASCADE,
+    UNIQUE (`restaurant_id`, `event_type`) -- Bu cheklov har bir restoranga faqat bitta morning va bitta night qo'shishga ruxsat beradi
 );
 
 CREATE TABLE IF NOT EXISTS `menu` (
