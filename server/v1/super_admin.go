@@ -5,8 +5,8 @@ import (
 	"log"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
 	"github.com/dgrijalva/jwt-go"
+	"github.com/gofiber/fiber/v2"
 	"github.com/sattorovshoxrux3009/Restourants_back/server/models"
 	"github.com/sattorovshoxrux3009/Restourants_back/storage/repo"
 	"golang.org/x/crypto/bcrypt"
@@ -29,7 +29,12 @@ func (h *handlerV1) CreateSuperAdmin(ctx *fiber.Ctx) error {
 	}
 
 	existingSuperAdmin, err := h.strg.SuperAdmin().GetByUsername(ctx.Context(), req.Username)
-	if err == nil && existingSuperAdmin != nil {
+
+	if err != nil {
+		return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Database error"})
+	}
+
+	if existingSuperAdmin != nil {
 		return ctx.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "This username already exists"})
 	}
 
@@ -39,7 +44,7 @@ func (h *handlerV1) CreateSuperAdmin(ctx *fiber.Ctx) error {
 		return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Error hashing password"})
 	}
 
-	superAdmin, err := h.strg.SuperAdmin().Create(ctx.Context(), &repo.CreateSuperAdmin{
+	superAdmin, err := h.strg.SuperAdmin().Create(ctx.Context(), &repo.SuperAdmin{
 		FirstName: req.FirstName,
 		LastName:  req.LastName,
 		Username:  req.Username,
@@ -63,11 +68,11 @@ func (h *handlerV1) Login(ctx *fiber.Ctx) error {
 	}
 
 	var role, hashedPassword, username, firstName, lastName string
-	var adminId int
+	var adminId uint
 
 	superAdmin, err := h.strg.SuperAdmin().GetByUsername(context.TODO(), req.Username)
 	if err == nil && superAdmin != nil {
-		role = "super_admin"
+		role = "superadmin"
 		hashedPassword = superAdmin.Password
 		username = superAdmin.Username
 		firstName = superAdmin.FirstName
@@ -75,6 +80,9 @@ func (h *handlerV1) Login(ctx *fiber.Ctx) error {
 	} else {
 		admin, err := h.strg.Admin().GetByUsername(context.TODO(), req.Username)
 		if err == nil && admin != nil {
+			if admin.Status != "active" {
+				return ctx.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Your account is blocked"})
+			}
 			role = "admin"
 			hashedPassword = admin.PasswordHash
 			username = admin.Username
@@ -95,20 +103,21 @@ func (h *handlerV1) Login(ctx *fiber.Ctx) error {
 		return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to generate token"})
 	}
 
-	if role == "super_admin" {
+	if role == "superadmin" {
 		err = h.strg.SuperAdmin().UpdateToken(ctx.Context(), username, token)
+		
 	} else {
-		tokens, err := h.strg.Token().GetByAdminId(ctx.Context(), adminId)
+		tokens, err := h.strg.Token().GetByAdminId(ctx.Context(), int(adminId))
 		if err != nil {
 			return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to fetch tokens"})
 		}
 		if len(tokens) >= 5 {
-			err := h.strg.Token().Delete(ctx.Context(), tokens[0].Id)
+			err := h.strg.Token().Delete(ctx.Context(), int(tokens[0].Id))
 			if err != nil {
 				return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to delete old token"})
 			}
 		}
-		_, err = h.strg.Token().Create(ctx.Context(), &repo.CreateToken{AdminId: adminId, Token: token})
+		h.strg.Token().Create(ctx.Context(), &repo.Token{AdminId: adminId, Token: token})
 	}
 
 	if err != nil {
@@ -159,7 +168,6 @@ func (h *handlerV1) UpdateSProfile(ctx *fiber.Ctx) error {
 	}
 	return ctx.JSON(fiber.Map{"message": "Profile updated"})
 }
-
 
 // package v1
 

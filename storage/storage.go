@@ -1,10 +1,9 @@
 package storage
 
 import (
-	"database/sql"
-
 	"github.com/sattorovshoxrux3009/Restourants_back/storage/mysql"
 	"github.com/sattorovshoxrux3009/Restourants_back/storage/repo"
+	"gorm.io/gorm"
 )
 
 type StorageI interface {
@@ -26,7 +25,7 @@ type storagePg struct {
 	eventPricesRepo           repo.EventPricesI
 }
 
-func NewStorage(mysqlConn *sql.DB) StorageI {
+func NewStorage(mysqlConn *gorm.DB) StorageI {
 	return &storagePg{
 		superAdminRepo:            mysql.NewSuperAdminStorage(mysqlConn),
 		adminRepo:                 mysql.NewAdminStorage(mysqlConn),

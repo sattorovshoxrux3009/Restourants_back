@@ -32,6 +32,6 @@ type UpdateAdmin struct {
 	LastName    string `json:"last_name"`
 	Email       string `json:"email"`
 	PhoneNumber string `json:"phone_number"`
-	Username    string `json:"username"`
-	Password    string `json:"password"`
+	OldPassword string `json:"old_password"`
+	NewPassword string `json:"new_password"`
 }

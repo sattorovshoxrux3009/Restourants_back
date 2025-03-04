@@ -2,376 +2,159 @@ package mysql
 
 import (
 	"context"
-	"database/sql"
 	"math"
-	"time"
 
 	"github.com/sattorovshoxrux3009/Restourants_back/storage/repo"
+	"gorm.io/gorm"
 )
 
 type menuRepo struct {
-	db *sql.DB
+	db *gorm.DB
 }
 
-func NewMenuStorage(db *sql.DB) repo.MenuI {
-	return &menuRepo{
-		db: db,
-	}
+func NewMenuStorage(db *gorm.DB) repo.MenuI {
+	return &menuRepo{db: db}
 }
 
-func (m *menuRepo) Create(ctx context.Context, req *repo.CreateMenu) (*repo.CreateMenu, error) {
-	query := `
-		INSERT INTO menu (
-			restaurant_id,
-			name, description,
-			price, category,
-			image_url
-		) VALUES (?, ?, ?, ?, ?, ?)
-	`
-	_, err := m.db.Exec(
-		query, req.RestaurantId,
-		req.Name, req.Description,
-		req.Price, req.Category,
-		req.ImageURL,
-	)
+func (m *menuRepo) Create(ctx context.Context, req *repo.Menu) (*repo.Menu, error) {
+	err := m.db.WithContext(ctx).Create(req).Error
 	if err != nil {
 		return nil, err
 	}
 	return req, nil
 }
 
-// for users, unlocked
 func (m *menuRepo) GetAll(ctx context.Context, name, category string, page, limit int) ([]repo.Menu, int, int, error) {
-	var total int
-	countQuery := `
-		SELECT COUNT(*) 
-        FROM menu m 
-        JOIN restaurants r ON m.restaurant_id = r.id 
-        WHERE r.status = 'active'
-	`
-	var args []interface{}
+	var menus []repo.Menu
+	var total int64
+
+	query := m.db.WithContext(ctx).Model(&repo.Menu{}).
+		Joins("JOIN restaurant r ON menu.restaurant_id = r.id").
+		Where("r.status = ?", "active")
 
 	if name != "" {
-		countQuery += " AND m.name LIKE ?"
-		args = append(args, "%"+name+"%")
+		query = query.Where("menu.name LIKE ?", "%"+name+"%")
 	}
 
 	if category != "" {
-		countQuery += " AND m.category LIKE ?"
-		args = append(args, "%"+category+"%")
+		query = query.Where("menu.category LIKE ?", "%"+category+"%")
 	}
 
-	// Umumiy natijalarni olish
-	err := m.db.QueryRowContext(ctx, countQuery, args...).Scan(&total)
-	if err != nil {
-		return nil, 0, 0, err
-	}
-
-	// Nechta sahifa borligini hisoblash
+	query.Count(&total)
 	totalPages := int(math.Ceil(float64(total) / float64(limit)))
 
-	// Ma'lumotlarni olish uchun so‘rov
-	query := `SELECT m.id, m.restaurant_id, m.name, m.description, m.price, m.category,m.image_url
-              FROM menu m
-              JOIN restaurants r ON m.restaurant_id = r.id
-              WHERE r.status = 'active'`
-	args = nil // Yangi argumentlar ro‘yxati
-
-	// Filtrlarni qo‘shish
-	if name != "" {
-		query += " AND m.name LIKE ?"
-		args = append(args, "%"+name+"%")
-	}
-
-	if category != "" {
-		query += " AND m.category LIKE ?"
-		args = append(args, "%"+category+"%")
-	}
-
-	// Sahifalash va tartiblash
-	query += " ORDER BY m.id ASC LIMIT ? OFFSET ?"
-	args = append(args, limit, (page-1)*limit)
-
-	// So‘rovni bajarish
-	rows, err := m.db.QueryContext(ctx, query, args...)
+	err := query.Order("menu.id ASC").Limit(limit).Offset((page - 1) * limit).
+		Find(&menus).Error
 	if err != nil {
-		return nil, 0, 0, err
-	}
-	defer rows.Close()
-
-	var menus []repo.Menu
-
-	for rows.Next() {
-		var menu repo.Menu
-		err := rows.Scan(
-			&menu.Id,
-			&menu.RestaurantId,
-			&menu.Name,
-			&menu.Description,
-			&menu.Price,
-			&menu.Category,
-			&menu.ImageURL,
-		)
-		if err != nil {
-			return nil, 0, 0, err
-		}
-		menus = append(menus, menu)
-	}
-
-	if err = rows.Err(); err != nil {
 		return nil, 0, 0, err
 	}
 
 	return menus, page, totalPages, nil
 }
 
-// for super admin
-func (m *menuRepo) GetSAll(ctx context.Context, name, category string, restaurant_id, page, limit int) ([]repo.MenuWithStatus, int, int, error) {
-	var total int
-	countQuery := `
-		SELECT COUNT(*) 
-        FROM menu m 
-        JOIN restaurants r ON m.restaurant_id = r.id
-        WHERE 1=1
-	`
-	var args []interface{}
+func (m *menuRepo) GetSAll(ctx context.Context, name, category string, restaurantID, page, limit int) ([]repo.Menu, int, int, error) {
+	var menus []repo.Menu
+	var total int64
+
+	query := m.db.WithContext(ctx).Model(&repo.Menu{}).
+		Select("menu.*, r.status AS restaurant_status"). // restaurant_status nomi bilan olamiz
+		Joins("JOIN restaurant r ON menu.restaurant_id = r.id")
 
 	if name != "" {
-		countQuery += " AND m.name LIKE ?"
-		args = append(args, "%"+name+"%")
+		query = query.Where("menu.name LIKE ?", "%"+name+"%")
 	}
 
 	if category != "" {
-		countQuery += " AND m.category LIKE ?"
-		args = append(args, "%"+category+"%")
+		query = query.Where("menu.category LIKE ?", "%"+category+"%")
 	}
 
-	if restaurant_id != 0 {
-		countQuery += " AND m.restaurant_id = ?"
-		args = append(args, restaurant_id)
+	if restaurantID != 0 {
+		query = query.Where("menu.restaurant_id = ?", restaurantID)
 	}
 
-	// Umumiy natijalarni olish
-	err := m.db.QueryRowContext(ctx, countQuery, args...).Scan(&total)
+	// Jami yozuvlar sonini hisoblash
+	query.Count(&total)
+	totalPages := int(math.Ceil(float64(total) / float64(limit)))
+
+	// Query bajarish
+	err := query.Order("menu.id ASC").
+		Limit(limit).
+		Offset((page - 1) * limit).
+		Find(&menus).Error
+
 	if err != nil {
 		return nil, 0, 0, err
 	}
 
-	// Nechta sahifa borligini hisoblash
-	totalPages := int(math.Ceil(float64(total) / float64(limit)))
+	return menus, page, totalPages, nil
+}
 
-	// Ma'lumotlarni olish uchun so‘rov
-	query := `
-		SELECT m.id, m.restaurant_id, m.name, m.description, m.price, m.category, m.image_url, m.created_at, m.updated_at, 
-		       r.status 
-		FROM menu m
-		JOIN restaurants r ON m.restaurant_id = r.id
-		WHERE 1=1
-	`
-	args = nil // Yangi argumentlar ro‘yxati
+func (m *menuRepo) GetSAllByRestaurants(ctx context.Context, name, category string, restaurantIDs []uint, page, limit int) ([]repo.Menu, int, int, error) {
+	var menus []repo.Menu
+	var total int64
+
+	// Agar adminning restorani bo'lmasa, bo'sh array qaytaramiz
+	if len(restaurantIDs) == 0 {
+		return []repo.Menu{}, page, 0, nil
+	}
+
+	// Query yaratish
+	query := m.db.WithContext(ctx).Model(&repo.Menu{}).Where("restaurant_id IN ?", restaurantIDs)
 
 	// Filtrlarni qo‘shish
 	if name != "" {
-		query += " AND m.name LIKE ?"
-		args = append(args, "%"+name+"%")
+		query = query.Where("name LIKE ?", "%"+name+"%")
 	}
-
 	if category != "" {
-		query += " AND m.category LIKE ?"
-		args = append(args, "%"+category+"%")
+		query = query.Where("category = ?", category)
 	}
 
-	if restaurant_id != 0 {
-		query += " AND m.restaurant_id = ?"
-		args = append(args, restaurant_id)
-	}
+	// Jami natijalarni sanash
+	query.Count(&total)
 
-	// Sahifalash va tartiblash
-	query += " ORDER BY m.id ASC LIMIT ? OFFSET ?"
-	args = append(args, limit, (page-1)*limit)
-
-	// So‘rovni bajarish
-	rows, err := m.db.QueryContext(ctx, query, args...)
-	if err != nil {
+	// Pagination (sahifalash) qilish
+	offset := (page - 1) * limit
+	if err := query.Limit(limit).Offset(offset).Find(&menus).Error; err != nil {
 		return nil, 0, 0, err
 	}
-	defer rows.Close()
 
-	var menus []repo.MenuWithStatus
-
-	for rows.Next() {
-		var menu repo.MenuWithStatus
-		var createdAtStr, updatedAtStr, restaurantStatus string
-		err := rows.Scan(
-			&menu.Id,
-			&menu.RestaurantId,
-			&menu.Name,
-			&menu.Description,
-			&menu.Price,
-			&menu.Category,
-			&menu.ImageURL,
-			&createdAtStr,
-			&updatedAtStr,
-			&restaurantStatus,
-		)
-		if err != nil {
-			return nil, 0, 0, err
-		}
-		menu.CreatedAt, _ = time.Parse("2006-01-02 15:04:05", createdAtStr)
-		menu.UpdatedAt, _ = time.Parse("2006-01-02 15:04:05", updatedAtStr)
-
-		// Restaurant statusi bo'yicha menyu statusini belgilash
-		if restaurantStatus == "active" {
-			menu.Status = "active"
-		} else {
-			menu.Status = "inactive"
-		}
-
-		menus = append(menus, menu)
-	}
-
-	if err = rows.Err(); err != nil {
-		return nil, 0, 0, err
-	}
+	// Jami sahifalar sonini hisoblash
+	totalPages := int((total + int64(limit) - 1) / int64(limit))
 
 	return menus, page, totalPages, nil
 }
 
 func (m *menuRepo) GetById(ctx context.Context, id int) (*repo.Menu, error) {
-	query := `SELECT id, restaurant_id, name, description, price, category, image_url, created_at, updated_at 
-	          FROM menu 
-	          WHERE id = ?`
-
 	var menu repo.Menu
-	var createdAtStr, updatedAtStr string
-
-	err := m.db.QueryRowContext(ctx, query, id).Scan(
-		&menu.Id,
-		&menu.RestaurantId,
-		&menu.Name,
-		&menu.Description,
-		&menu.Price,
-		&menu.Category,
-		&menu.ImageURL,
-		&createdAtStr,
-		&updatedAtStr,
-	)
-
+	err := m.db.WithContext(ctx).First(&menu, id).Error
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, nil
-		}
 		return nil, err
 	}
-
-	// Vaqt formatini pars qilish
-	menu.CreatedAt, _ = time.Parse("2006-01-02 15:04:05", createdAtStr)
-	menu.UpdatedAt, _ = time.Parse("2006-01-02 15:04:05", updatedAtStr)
-
 	return &menu, nil
 }
 
-func (m *menuRepo) GetByRestourantId(ctx context.Context, id int) ([]*repo.Menu, error) {
-	query := `SELECT id, restaurant_id, name, description, price, category, image_url, created_at, updated_at 
-	          FROM menu 
-	          WHERE restaurant_id = ?`
-
-	rows, err := m.db.QueryContext(ctx, query, id)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
+func (m *menuRepo) GetByRestaurantId(ctx context.Context, id int) ([]*repo.Menu, error) {
 	var menus []*repo.Menu
 
-	for rows.Next() {
-		var menu repo.Menu
-		var createdAtStr, updatedAtStr string
-
-		err := rows.Scan(
-			&menu.Id,
-			&menu.RestaurantId,
-			&menu.Name,
-			&menu.Description,
-			&menu.Price,
-			&menu.Category,
-			&menu.ImageURL,
-			&createdAtStr,
-			&updatedAtStr,
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		// Vaqt formatini pars qilish
-		menu.CreatedAt, _ = time.Parse("2006-01-02 15:04:05", createdAtStr)
-		menu.UpdatedAt, _ = time.Parse("2006-01-02 15:04:05", updatedAtStr)
-
-		menus = append(menus, &menu)
-	}
-
-	// Agar menyu topilmasa, nil qaytaramiz
-	if len(menus) == 0 {
-		return nil, nil
+	if err := m.db.WithContext(ctx).Where("restaurant_id = ?", id).Find(&menus).Error; err != nil {
+		return nil, err
 	}
 
 	return menus, nil
 }
 
-func (m *menuRepo) Update(ctx context.Context, id int, req *repo.CreateMenu) (*repo.CreateMenu, error) {
-	// Tranzaksiyani boshlash
-	tx, err := m.db.Begin()
-	if err != nil {
-		return nil, err
-	}
+func (m *menuRepo) Update(ctx context.Context, id int, req *repo.Menu) (*repo.Menu, error) {
+	result := m.db.WithContext(ctx).Model(&repo.Menu{}).Where("id = ?", id).Updates(req)
 
-	// Agar xatolik bo‘lsa, tranzaksiyani bekor qilish (rollback)
-	defer func() {
-		if err != nil {
-			tx.Rollback()
-		}
-	}()
-
-	query := `UPDATE menu 
-	          SET name = ?, description = ?, price = ?, category = ?, image_url = ? 
-	          WHERE id = ?`
-
-	_, err = tx.Exec(query, req.Name, req.Description, req.Price, req.Category, req.ImageURL, id)
-	if err != nil {
-		return nil, err
-	}
-
-	// Agar hammasi yaxshi bo‘lsa, tranzaksiyani tasdiqlash (commit)
-	err = tx.Commit()
-	if err != nil {
-		return nil, err
+	if result.Error != nil {
+		return nil, result.Error
 	}
 
 	return req, nil
 }
 
 func (m *menuRepo) Delete(ctx context.Context, id int) error {
-
-	tx, err := m.db.Begin()
-	if err != nil {
-		return err
-	}
-
-	defer func() {
-		if err != nil {
-			tx.Rollback()
-		}
-	}()
-
-	query := `DELETE FROM menu WHERE id = ?`
-
-	_, err = tx.Exec(query, id)
-	if err != nil {
-		return err
-	}
-
-	err = tx.Commit()
-	if err != nil {
+	if err := m.db.WithContext(ctx).Where("id = ?", id).Delete(&repo.Menu{}).Error; err != nil {
 		return err
 	}
 

@@ -11,7 +11,7 @@ type Restourants struct {
 	PhoneNumber       string    `json:"phone_number"`
 	Email             string    `json:"email"`
 	Capacity          int       `json:"capacity"`
-	OwnerID           int       `json:"owner_id"`
+	OwnerId           int       `json:"owner_id"`
 	OpeningHours      string    `json:"opening_hours"`
 	ImageURL          string    `json:"image_url"`
 	Description       string    `json:"description"`
@@ -20,7 +20,7 @@ type Restourants struct {
 	UpdatedAt         time.Time `json:"updated_at"`
 }
 
-type CreateRestourants struct {
+type CreateRestaurants struct {
 	Name              string  `json:"name"`
 	Address           string  `json:"address"`
 	Latitude          float64 `json:"latitude"`

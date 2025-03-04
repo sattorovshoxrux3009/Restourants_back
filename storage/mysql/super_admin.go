@@ -3,223 +3,113 @@ package mysql
 import (
 	"context"
 	"database/sql"
+	"errors"
+	"fmt"
 	"time"
 
 	"github.com/sattorovshoxrux3009/Restourants_back/storage/repo"
+	"gorm.io/gorm"
 )
 
 type superAdminRepo struct {
-	db *sql.DB
+	db *gorm.DB
 }
 
-func NewSuperAdminStorage(db *sql.DB) repo.SuperAdminStorageI {
+func NewSuperAdminStorage(db *gorm.DB) repo.SuperAdminStorageI {
 	return &superAdminRepo{
 		db: db,
 	}
 }
 
-func (s *superAdminRepo) Create(ctx context.Context, req *repo.CreateSuperAdmin) (*repo.CreateSuperAdmin, error) {
-	query := `
-		INSERT INTO super_admins (
-			first_name,
-			last_name,
-			username,
-			password
-		) VALUES (?, ?, ?, ?)
-	`
-	_, err := s.db.Exec(query, req.FirstName, req.LastName, req.Username, req.Password)
-	if err != nil {
+func (s *superAdminRepo) Create(ctx context.Context, req *repo.SuperAdmin) (*repo.SuperAdmin, error) {
+	if err := s.db.Create(req).Error; err != nil {
 		return nil, err
 	}
-	if req.CreatedAt.IsZero() {
-		req.CreatedAt = time.Now()
-	}
+
 	return req, nil
 }
 
 func (s *superAdminRepo) GetByUsername(ctx context.Context, username string) (*repo.SuperAdmin, error) {
-	query := `
-		SELECT 
-			id, first_name, last_name , username,
-			password, created_at, 
-			token, last_login
-		FROM super_admins WHERE username=?
-	`
 	var admin repo.SuperAdmin
-	var createdAt, last_login []byte
-	var token sql.NullString
-	err := s.db.QueryRow(query, username).Scan(
-		&admin.Id,
-		&admin.FirstName,
-		&admin.LastName,
-		&admin.Username,
-		&admin.Password,
-		&createdAt,
-		&token,
-		&last_login,
-	)
-	if err != nil {
-		return nil, err
-	}
-	if len(createdAt) > 0 {
-		parsedTime, err := time.Parse("2006-01-02 15:04:05", string(createdAt))
-		if err != nil {
-			return nil, err
+	result := s.db.WithContext(ctx).Where("username = ?", username).First(&admin)
+
+	if result.Error != nil {
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			return nil, nil // Foydalanuvchi yo‘q bo‘lsa, shunchaki nil qaytarish
 		}
-		admin.CreatedAt = parsedTime
+		fmt.Println("DB QUERY ERROR:", result.Error) // ✅ Faqat haqiqiy xatolarni chiqarish
+		return nil, result.Error
 	}
-	if len(last_login) > 0 {
-		parsedTime, err := time.Parse("2006-01-02 15:04:05", string(last_login))
-		if err != nil {
-			return nil, err
-		}
-		admin.LastLogin = parsedTime
-	}
-	if token.Valid {
-		admin.Token = token.String
-	} else {
-		admin.Token = ""
-	}
+
 	return &admin, nil
 }
 
 func (s *superAdminRepo) GetToken(ctx context.Context, username string) (string, error) {
-	query := `
-		SELECT  
-			token
-		FROM super_admins WHERE username=?
-	`
-	var token sql.NullString
-	err := s.db.QueryRow(query, username).Scan(
-		&token,
-	)
+	var token string
+
+	err := s.db.Model(&repo.SuperAdmin{}).
+		Select("token").
+		Where("username = ?", username).
+		Scan(&token).Error
+
 	if err != nil {
 		return "", err
 	}
-	if token.Valid {
-		return token.String, err
-	} else {
-		return "", err
-	}
+
+	return token, nil
 }
 
 func (s *superAdminRepo) Update(ctx context.Context, req *repo.SuperAdmin) error {
-	tsx, err := s.db.Begin()
-	if err != nil {
-		return err
-	}
-	query := `
-		UPDATE super_admins SET 
-			first_name=?,
-			last_name=?,
-			password=?
-		WHERE username=?
-	`
-	_, err = tsx.Exec(query, req.FirstName, req.LastName, req.Password, req.Username)
-	if err != nil {
-		errRoll := tsx.Rollback()
-		if errRoll != nil {
-			return errRoll
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		res := tx.Model(&repo.SuperAdmin{}).
+			Where("username = ?", req.Username).
+			Updates(map[string]interface{}{
+				"first_name": req.FirstName,
+				"last_name":  req.LastName,
+				"password":   req.Password,
+			})
+
+		if res.Error != nil {
+			return res.Error
 		}
-		return err
-	}
-	err = tsx.Commit()
-	if err != nil {
-		errRoll := tsx.Rollback()
-		if errRoll != nil {
-			return errRoll
+		if res.RowsAffected == 0 {
+			return sql.ErrNoRows
 		}
-		return err
-	}
-	return nil
+		return nil
+	})
 }
 
 func (s *superAdminRepo) UpdatePassword(ctx context.Context, username, password string) error {
-	tsx, err := s.db.Begin()
-	if err != nil {
-		return err
-	}
-	query := `
-		UPDATE super_admins SET 
-			password=?
-		WHERE username=?
-	`
-	res, err := tsx.Exec(query, password, username)
-	if err != nil {
-		errRoll := tsx.Rollback()
-		if errRoll != nil {
-			return errRoll
-		}
-		return err
-	}
-	data, err := res.RowsAffected()
-	if err != nil {
-		errRoll := tsx.Rollback()
-		if errRoll != nil {
-			return errRoll
-		}
-		return err
-	}
-	if data == 0 {
-		errRoll := tsx.Rollback()
-		if errRoll != nil {
-			return errRoll
-		}
-		return sql.ErrNoRows
-	}
-	err = tsx.Commit()
-	if err != nil {
-		errRoll := tsx.Rollback()
-		if errRoll != nil {
-			return errRoll
-		}
-		return err
-	}
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		res := tx.Model(&repo.SuperAdmin{}).
+			Where("username = ?", username).
+			Update("password", password)
 
-	return nil
+		if res.Error != nil {
+			return res.Error
+		}
+		if res.RowsAffected == 0 {
+			return sql.ErrNoRows
+		}
+		return nil
+	})
 }
 
 func (s *superAdminRepo) UpdateToken(ctx context.Context, username, token string) error {
-	tsx, err := s.db.Begin()
-	if err != nil {
-		return err
-	}
-	query := `
-		UPDATE super_admins SET 
-			token=?
-		WHERE username=?
-	`
-	res, err := tsx.Exec(query, token, username)
-	if err != nil {
-		errRoll := tsx.Rollback()
-		if errRoll != nil {
-			return errRoll
-		}
-		return err
-	}
-	data, err := res.RowsAffected()
-	if err != nil {
-		errRoll := tsx.Rollback()
-		if errRoll != nil {
-			return errRoll
-		}
-		return err
-	}
-	if data == 0 {
-		errRoll := tsx.Rollback()
-		if errRoll != nil {
-			return errRoll
-		}
-		return sql.ErrNoRows
-	}
-	err = tsx.Commit()
-	if err != nil {
-		errRoll := tsx.Rollback()
-		if errRoll != nil {
-			return errRoll
-		}
-		return err
-	}
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		res := tx.Model(&repo.SuperAdmin{}).
+			Where("username = ?", username).
+			Updates(map[string]interface{}{
+				"token":      token,
+				"last_login": time.Now(),
+			})
 
-	return nil
+		if res.Error != nil {
+			return res.Error
+		}
+		if res.RowsAffected == 0 {
+			return sql.ErrNoRows
+		}
+		return nil
+	})
 }

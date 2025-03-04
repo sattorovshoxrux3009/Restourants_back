@@ -71,54 +71,53 @@ func NewServer(opts *Options) *fiber.App {
 	// Statik fayllar uchun
 	app.Static("/uploads", "./uploads")
 
-	// Auth yo‘nalishlari
-	app.Post("/v1/create-s-admin", handler.CreateSuperAdmin)
+	app.Post("/v1/s-admin", handler.CreateSuperAdmin)
 	app.Post("/v1/login", handler.Login)
 
-	// Restoran va menyu yo‘nalishlari
-	app.Get("/v1/restaurants", handler.GetRestourants)
-	app.Get("/v1/restaurants/:id", handler.GetRestourants)
-	app.Get("/v1/menu", handler.GetMenu)
-	app.Get("/v1/menu/:id", handler.GetMenu)
-
-	// Super Admin yo‘nalishlari
-	superAdmin := app.Group("/v1", handler.AuthMiddleware(), handler.SuperAdminMiddleware())
+	superAdmin := app.Group("/v1/superadmin", handler.AuthMiddleware(), handler.SuperAdminMiddleware())
 	{
-		superAdmin.Get("/admins", handler.GetAdmins)
-		superAdmin.Get("/admins/:id", handler.GetAdmins)
+		superAdmin.Get("/admins/:id?", handler.GetAdmins)
 		superAdmin.Get("/admins/:id/details", handler.GetAdminDetails)
-		superAdmin.Get("/s-restaurants", handler.GetSRestourants)
-		superAdmin.Get("/s-restaurants/:id", handler.GetSRestourants)
-		superAdmin.Get("/s-restaurants/:id/details", handler.GetSRestaurantDetails)
-		superAdmin.Get("/s-menu", handler.GetSMenu)
-		superAdmin.Get("/s-menu/:id", handler.GetSMenu)
-		superAdmin.Get("/s-profile", handler.GetSProfile)
-		superAdmin.Get("/s-event-prices", handler.GetSEventPrices)
-		superAdmin.Get("/s-event-prices/:id", handler.GetSEventPrices)
+		superAdmin.Get("/restaurants/:id?", handler.GetSRestaurants)
+		superAdmin.Get("/restaurants/:id/details", handler.GetSRestaurantDetails)
+		superAdmin.Get("/menu/:id?", handler.GetSMenu)
+		superAdmin.Get("/profile", handler.GetSProfile)
+		superAdmin.Get("/event-prices/:id?", handler.GetSEventPrices)
 
-		superAdmin.Post("/create-admin", handler.CreateAdmin)
-		superAdmin.Post("/create-restaurant", handler.CreateRestaurant)
-		superAdmin.Post("/s-menu", handler.CreateSMenu)
-		superAdmin.Post("/s-event-prices", handler.CreateSEventPrices)
+		superAdmin.Post("/admin", handler.CreateAdmin)
+		superAdmin.Post("/restaurant", handler.CreateSRestaurant)
+		superAdmin.Post("/menu", handler.CreateSMenu)
+		superAdmin.Post("/event-prices", handler.CreateSEventPrices)
 
-		superAdmin.Put("/update-admin/:id", handler.UpdateAdmin)
-		superAdmin.Put("/restaurants/:id/status", handler.UpdateRestaurantStatus)
-		superAdmin.Put("/restaurants/:id", handler.UpdateRestaurant)
-		superAdmin.Put("/s-menu/:id", handler.UpdateSMenu)
-		superAdmin.Put("/s-profile", handler.UpdateSProfile)
-		superAdmin.Put("/s-event-prices/:id", handler.UpdateSEventPrices)
+		superAdmin.Put("/admin/:id", handler.UpdateAdmin)
+		superAdmin.Put("/restaurants/:id/status", handler.UpdateSRestaurantStatus)
+		superAdmin.Put("/restaurants/:id", handler.UpdateSRestaurant)
+		superAdmin.Put("/menu/:id", handler.UpdateSMenu)
+		superAdmin.Put("/profile", handler.UpdateSProfile)
+		superAdmin.Put("/event-prices/:id", handler.UpdateSEventPrices)
 
 		superAdmin.Delete("/admin/:id", handler.DeleteAdmin)
-		superAdmin.Delete("/s-restaurants/:id", handler.DeleteRestaurant)
-		superAdmin.Delete("/s-menu/:id", handler.DeleteSMenu)
-		superAdmin.Delete("/s-event-prices/:id", handler.DeleteSEventPrices)
+		superAdmin.Delete("/restaurants/:id", handler.DeleteSRestaurant)
+		superAdmin.Delete("/menu/:id", handler.DeleteSMenu)
+		superAdmin.Delete("/event-prices/:id", handler.DeleteSEventPrices)
 	}
-
-	// // Admin yo‘nalishlari
-	admin := app.Group("/v1", handler.AuthMiddleware(), handler.AdminMiddleware())
+	admin := app.Group("/v1/admin", handler.AuthMiddleware(), handler.AdminMiddleware())
 	{
 		admin.Get("/profile", handler.GetProfile)
+		admin.Get("/restaurants/:id?", handler.GetARestaurants)
+		admin.Get("/menu/:id?", handler.GetAMenu)
+
+		admin.Put("/profile", handler.UpdateProfile)
+		admin.Put("/restaurants/:id", handler.UpdateARestauranats)
+
+		admin.Post("/restaurants", handler.CreateARestaurant)
+		admin.Post("/menu", handler.CreateAMenu)
+	
+		admin.Delete("/restaurants/:id", handler.DeleteARestaurants)
 	}
+
+	app.Get("/v1/restaurants/:id?", handler.GetRestaurants)
+	app.Get("/v1/menu/:id?", handler.GetMenu)
 
 	return app
 }

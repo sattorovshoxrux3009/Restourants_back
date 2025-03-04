@@ -65,8 +65,7 @@ func (h *handlerV1) AdminMiddleware() fiber.Handler {
 		if err != nil || admin == nil {
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Admin not found"})
 		}
-
-		adminTokens, err := h.strg.Token().GetByAdminId(c.Context(), admin.Id)
+		adminTokens, err := h.strg.Token().GetByAdminId(c.Context(), int(admin.Id))
 		if err != nil || len(adminTokens) == 0 {
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Admin token not found"})
 		}

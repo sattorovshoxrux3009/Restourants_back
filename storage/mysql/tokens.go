@@ -2,30 +2,24 @@ package mysql
 
 import (
 	"context"
-	"database/sql"
-	"time"
 
 	"github.com/sattorovshoxrux3009/Restourants_back/storage/repo"
+	"gorm.io/gorm"
 )
 
 type tokenRepo struct {
-	db *sql.DB
+	db *gorm.DB
 }
 
-func NewTokenStorage(db *sql.DB) repo.TokenStorageI {
+func NewTokenStorage(db *gorm.DB) repo.TokenStorageI {
 	return &tokenRepo{
 		db: db,
 	}
 }
 
-func (t *tokenRepo) Create(ctx context.Context, req *repo.CreateToken) (*repo.CreateToken, error) {
-	query := `
-		INSERT INTO tokens (
-			admin_id,
-			token
-		) VALUES (?, ?)
-	`
-	_, err := t.db.Exec(query, req.AdminId, req.Token)
+func (t *tokenRepo) Create(ctx context.Context, req *repo.Token) (*repo.Token, error) {
+	// Token qo'shish
+	err := t.db.WithContext(ctx).Create(req).Error
 	if err != nil {
 		return nil, err
 	}
@@ -33,45 +27,17 @@ func (t *tokenRepo) Create(ctx context.Context, req *repo.CreateToken) (*repo.Cr
 }
 
 func (t *tokenRepo) GetByAdminId(ctx context.Context, id int) ([]repo.Token, error) {
-	query := `
-		SELECT 
-			id, admin_id, 
-			token, auth_time
-		FROM tokens 
-		WHERE admin_id = ?
-	`
+	var tokens []repo.Token
 
-	rows, err := t.db.QueryContext(ctx, query, id)
+	// admin_id bo'yicha tokenlarni olish
+	err := t.db.WithContext(ctx).
+		Where("admin_id = ?", id).
+		Find(&tokens).Error
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
-	var tokens []repo.Token
-
-	for rows.Next() {
-		var token repo.Token
-		var auth_time string
-
-		err := rows.Scan(
-			&token.Id,
-			&token.AdminId,
-			&token.Token,
-			&auth_time,
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		token.AuthTime, err = time.Parse("2006-01-02 15:04:05", auth_time)
-		if err != nil {
-			return nil, err
-		}
-
-		tokens = append(tokens, token)
-	}
-
-	// Agar hech qanday token topilmasa, bo'sh slice qaytaramiz (`nil` emas)
+	// Agar hech qanday token bo'lmasa, bo'sh slice qaytarish
 	if len(tokens) == 0 {
 		return []repo.Token{}, nil
 	}
@@ -80,49 +46,47 @@ func (t *tokenRepo) GetByAdminId(ctx context.Context, id int) ([]repo.Token, err
 }
 
 func (t *tokenRepo) Delete(ctx context.Context, id int) error {
-	tx, err := t.db.Begin()
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			tx.Rollback()
-		}
-	}()
+	// Transaction yaratish
+	tx := t.db.Begin()
 
-	query := `DELETE FROM tokens WHERE id = ?`
-	_, err = tx.ExecContext(ctx, query, id)
+	if tx.Error != nil {
+		return tx.Error
+	}
+
+	// Tokenni o'chirish
+	err := tx.WithContext(ctx).Where("id = ?", id).Delete(&repo.Token{}).Error
 	if err != nil {
 		tx.Rollback()
 		return err
 	}
-	err = tx.Commit()
+
+	err = tx.Commit().Error
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
 func (t *tokenRepo) DeleteByAdminId(ctx context.Context, id int) error {
-	tx, err := t.db.Begin()
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			tx.Rollback()
-		}
-	}()
+	// Transaction yaratish
+	tx := t.db.Begin()
 
-	query := `DELETE FROM tokens WHERE admin_id = ?`
-	_, err = tx.ExecContext(ctx, query, id)
+	if tx.Error != nil {
+		return tx.Error
+	}
+
+	// admin_id bo'yicha tokenni o'chirish
+	err := tx.WithContext(ctx).Where("admin_id = ?", id).Delete(&repo.Token{}).Error
 	if err != nil {
 		tx.Rollback()
 		return err
 	}
-	err = tx.Commit()
+
+	err = tx.Commit().Error
 	if err != nil {
 		return err
 	}
+
 	return nil
 }

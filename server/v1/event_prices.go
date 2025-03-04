@@ -10,7 +10,7 @@ import (
 )
 
 func (h *handlerV1) CreateSEventPrices(c *fiber.Ctx) error {
-	var req models.CreateEventPrices
+	var req models.EventPrice
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
 	}
@@ -32,8 +32,8 @@ func (h *handlerV1) CreateSEventPrices(c *fiber.Ctx) error {
 			})
 		}
 	}
-	EventPrice, err := h.strg.EventPrices().Create(c.Context(), &repo.CreateEventPrices{
-		RestaurantId:      req.RestaurantId,
+	EventPrice, err := h.strg.EventPrices().Create(c.Context(), &repo.EventPrice{
+		RestaurantId:      uint(req.RestaurantId),
 		EventType:         req.EventType,
 		TablePrice:        req.TablePrice,
 		WaiterPrice:       req.WaiterPrice,

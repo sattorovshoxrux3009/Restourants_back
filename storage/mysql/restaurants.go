@@ -2,77 +2,69 @@ package mysql
 
 import (
 	"context"
-	"database/sql"
+	"errors"
 	"math"
-	"time"
 
 	"github.com/sattorovshoxrux3009/Restourants_back/storage/repo"
+	"gorm.io/gorm"
 )
 
 type restaurantsRepo struct {
-	db *sql.DB
+	db *gorm.DB
 }
 
-func NewRestaurantsStorage(db *sql.DB) repo.RestaurantsI {
+func NewRestaurantsStorage(db *gorm.DB) repo.RestaurantsI {
 	return &restaurantsRepo{
 		db: db,
 	}
 }
 
-func (r *restaurantsRepo) Create(ctx context.Context, req *repo.CreateRestaurant) (*repo.CreateRestaurant, error) {
-	query := `
-		INSERT INTO restaurants (
-			name, address,
-			latitude, longitude,
-			phone_number, email,
-			capacity, owner_id,
-			opening_hours, image_url,
-			description, alcohol_permission
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`
-	_, err := r.db.Exec(
-		query, req.Name,
-		req.Address, req.Latitude,
-		req.Longitude, req.PhoneNumber,
-		req.Email, req.Capacity,
-		req.OwnerID, req.OpeningHours,
-		req.ImageURL, req.Description,
-		req.AlcoholPermission,
-	)
-	if err != nil {
+func (r *restaurantsRepo) Create(ctx context.Context, req *repo.Restaurant) (*repo.Restaurant, error) {
+	restaurant := repo.Restaurant{
+		Name:              req.Name,
+		Address:           req.Address,
+		Latitude:          req.Latitude,
+		Longitude:         req.Longitude,
+		PhoneNumber:       req.PhoneNumber,
+		Email:             req.Email,
+		Capacity:          req.Capacity,
+		OwnerId:           uint(req.OwnerId),
+		OpeningHours:      req.OpeningHours,
+		ImageURL:          req.ImageURL,
+		Description:       req.Description,
+		AlcoholPermission: req.AlcoholPermission,
+	}
+
+	if err := r.db.Create(&restaurant).Error; err != nil {
 		return nil, err
 	}
 	return req, nil
 }
 
 // for users, unlocked
-func (r *restaurantsRepo) GetAll(ctx context.Context, name, address, capacity, adlcohol_permission string, page, limit int) ([]repo.Restaurant, int, int, error) {
-	var total int
-	countQuery := `SELECT COUNT(*) FROM restaurants WHERE status = 'active'`
-	var args []interface{}
+func (r *restaurantsRepo) GetAll(ctx context.Context, name, address, capacity, alcoholPermission string, page, limit int) ([]repo.Restaurant, int, int, error) {
+	var total int64
+	var restaurants []repo.Restaurant
+	var err error
+
+	query := r.db.Model(&repo.Restaurant{}).Where("status = ?", "active")
 
 	// Qidiruv parametrlarini qo‘shish
 	if name != "" {
-		countQuery += " AND name LIKE ?"
-		args = append(args, "%"+name+"%")
+		query = query.Where("name LIKE ?", "%"+name+"%")
 	}
-
 	if address != "" {
-		countQuery += " AND address LIKE ?"
-		args = append(args, "%"+address+"%")
+		query = query.Where("address LIKE ?", "%"+address+"%")
 	}
-
 	if capacity != "" {
-		countQuery += " AND capacity LIKE ?"
-		args = append(args, "%"+capacity+"%")
+		query = query.Where("capacity LIKE ?", "%"+capacity+"%")
+	}
+	if alcoholPermission != "" {
+		query = query.Where("alcohol_permission LIKE ?", "%"+alcoholPermission+"%")
 	}
 
-	if adlcohol_permission != "" {
-		countQuery += " AND adlcohol_permission LIKE ?"
-		args = append(args, "%"+adlcohol_permission+"%")
-	}
-
-	err := r.db.QueryRowContext(ctx, countQuery, args...).Scan(&total)
+	// So'rovni bajarish
+	err = query.Count(&total).Error
 	if err != nil {
 		return nil, 0, 0, err
 	}
@@ -80,71 +72,9 @@ func (r *restaurantsRepo) GetAll(ctx context.Context, name, address, capacity, a
 	// Nechta sahifa borligini hisoblash
 	totalPages := int(math.Ceil(float64(total) / float64(limit)))
 
-	// Adminlarni olish uchun so‘rov
-	query := `SELECT id, name, address, latitude, longitude, phone_number, email, capacity, owner_id, opening_hours, image_url, description, alcohol_permission 
-              FROM restaurants WHERE status = 'active'`
-	args = nil // Fresh args list
-
-	// Qidiruv parametrlarini qo‘shish
-	if name != "" {
-		query += " AND name LIKE ?"
-		args = append(args, "%"+name+"%")
-	}
-
-	if address != "" {
-		query += " AND address LIKE ?"
-		args = append(args, "%"+address+"%")
-	}
-
-	if capacity != "" {
-		query += " AND capacity LIKE ?"
-		args = append(args, "%"+capacity+"%")
-	}
-
-	if adlcohol_permission != "" {
-		query += " AND adlcohol_permission LIKE ?"
-		args = append(args, "%"+adlcohol_permission+"%")
-	}
-
-	// Sahifani tartiblaymiz va limit qo‘shamiz
-	query += " ORDER BY id ASC LIMIT ? OFFSET ?"
-	args = append(args, limit, (page-1)*limit)
-
-	// So‘rovni bajarish
-	rows, err := r.db.QueryContext(ctx, query, args...)
+	// Qidiruv natijalarini olish
+	err = query.Offset((page - 1) * limit).Limit(limit).Find(&restaurants).Error
 	if err != nil {
-		return nil, 0, 0, err
-	}
-	defer rows.Close()
-
-	var restaurants []repo.Restaurant
-
-	// Natijalarni yig‘ish
-	for rows.Next() {
-		var restaurant repo.Restaurant
-
-		err := rows.Scan(
-			&restaurant.Id,
-			&restaurant.Name,
-			&restaurant.Address,
-			&restaurant.Latitude,
-			&restaurant.Longitude,
-			&restaurant.PhoneNumber,
-			&restaurant.Email,
-			&restaurant.Capacity,
-			&restaurant.OwnerID,
-			&restaurant.OpeningHours,
-			&restaurant.ImageURL,
-			&restaurant.Description,
-			&restaurant.AlcoholPermission,
-		)
-		if err != nil {
-			return nil, 0, 0, err
-		}
-		restaurants = append(restaurants, restaurant)
-	}
-
-	if err = rows.Err(); err != nil {
 		return nil, 0, 0, err
 	}
 
@@ -152,81 +82,41 @@ func (r *restaurantsRepo) GetAll(ctx context.Context, name, address, capacity, a
 }
 
 // for super admin
-func (r *restaurantsRepo) GetSall(ctx context.Context, status, phonenumber, email, ownerid, name, address, capacity, alcohol_permission string, page, limit int) ([]repo.Restaurant, int, int, error) {
-	var total int
-	countQuery := `SELECT COUNT(*) FROM restaurants`
-	var args []interface{}
+func (r *restaurantsRepo) GetSall(ctx context.Context, status, phonenumber, email, ownerid, name, address, capacity, alcoholPermission string, page, limit int) ([]repo.Restaurant, int, int, error) {
+	var total int64
+	var restaurants []repo.Restaurant
+	var err error
+
+	query := r.db.Model(&repo.Restaurant{})
 
 	// Qidiruv parametrlarini qo‘shish
 	if status != "" {
-		countQuery += " WHERE status = ?"
-		args = append(args, status)
+		query = query.Where("status = ?", status)
 	}
-
 	if phonenumber != "" {
-		if len(args) > 0 {
-			countQuery += " AND phone_number LIKE ?"
-		} else {
-			countQuery += " WHERE phone_number LIKE ?"
-		}
-		args = append(args, "%"+phonenumber+"%")
+		query = query.Where("phone_number LIKE ?", "%"+phonenumber+"%")
 	}
-
 	if email != "" {
-		if len(args) > 0 {
-			countQuery += " AND email LIKE ?"
-		} else {
-			countQuery += " WHERE email LIKE ?"
-		}
-		args = append(args, "%"+email+"%")
+		query = query.Where("email LIKE ?", "%"+email+"%")
 	}
-
 	if ownerid != "" {
-		if len(args) > 0 {
-			countQuery += " AND owner_id LIKE ?"
-		} else {
-			countQuery += " WHERE owner_id LIKE ?"
-		}
-		args = append(args, "%"+ownerid+"%")
+		query = query.Where("owner_id LIKE ?", "%"+ownerid+"%")
 	}
-
 	if name != "" {
-		if len(args) > 0 {
-			countQuery += " AND name LIKE ?"
-		} else {
-			countQuery += " WHERE name LIKE ?"
-		}
-		args = append(args, "%"+name+"%")
+		query = query.Where("name LIKE ?", "%"+name+"%")
 	}
-
 	if address != "" {
-		if len(args) > 0 {
-			countQuery += " AND address LIKE ?"
-		} else {
-			countQuery += " WHERE address LIKE ?"
-		}
-		args = append(args, "%"+address+"%")
+		query = query.Where("address LIKE ?", "%"+address+"%")
 	}
-
 	if capacity != "" {
-		if len(args) > 0 {
-			countQuery += " AND capacity LIKE ?"
-		} else {
-			countQuery += " WHERE capacity LIKE ?"
-		}
-		args = append(args, "%"+capacity+"%")
+		query = query.Where("capacity LIKE ?", "%"+capacity+"%")
+	}
+	if alcoholPermission != "" {
+		query = query.Where("alcohol_permission LIKE ?", "%"+alcoholPermission+"%")
 	}
 
-	if alcohol_permission != "" {
-		if len(args) > 0 {
-			countQuery += " AND alcohol_permission LIKE ?"
-		} else {
-			countQuery += " WHERE alcohol_permission LIKE ?"
-		}
-		args = append(args, "%"+alcohol_permission+"%")
-	}
-
-	err := r.db.QueryRowContext(ctx, countQuery, args...).Scan(&total)
+	// So'rovni bajarish
+	err = query.Count(&total).Error
 	if err != nil {
 		return nil, 0, 0, err
 	}
@@ -234,352 +124,54 @@ func (r *restaurantsRepo) GetSall(ctx context.Context, status, phonenumber, emai
 	// Nechta sahifa borligini hisoblash
 	totalPages := int(math.Ceil(float64(total) / float64(limit)))
 
-	// Adminlarni olish uchun so‘rov
-	query := `SELECT id, name, address, latitude, longitude, phone_number, email, capacity, owner_id, opening_hours, image_url, description, alcohol_permission, status ,created_at, updated_at
-	          FROM restaurants`
-	args = nil // Fresh args list
-
-	// Qidiruv parametrlarini qo‘shish
-	if status != "" {
-		query += " WHERE status = ?"
-		args = append(args, status)
-	}
-
-	if phonenumber != "" {
-		if len(args) > 0 {
-			query += " AND phone_number LIKE ?"
-		} else {
-			query += " WHERE phone_number LIKE ?"
-		}
-		args = append(args, "%"+phonenumber+"%")
-	}
-
-	if email != "" {
-		if len(args) > 0 {
-			query += " AND email LIKE ?"
-		} else {
-			query += " WHERE email LIKE ?"
-		}
-		args = append(args, "%"+email+"%")
-	}
-
-	if ownerid != "" {
-		if len(args) > 0 {
-			query += " AND owner_id LIKE ?"
-		} else {
-			query += " WHERE owner_id LIKE ?"
-		}
-		args = append(args, "%"+ownerid+"%")
-	}
-
-	if name != "" {
-		if len(args) > 0 {
-			query += " AND name LIKE ?"
-		} else {
-			query += " WHERE name LIKE ?"
-		}
-		args = append(args, "%"+name+"%")
-	}
-
-	if address != "" {
-		if len(args) > 0 {
-			query += " AND address LIKE ?"
-		} else {
-			query += " WHERE address LIKE ?"
-		}
-		args = append(args, "%"+address+"%")
-	}
-
-	if capacity != "" {
-		if len(args) > 0 {
-			query += " AND capacity LIKE ?"
-		} else {
-			query += " WHERE capacity LIKE ?"
-		}
-		args = append(args, "%"+capacity+"%")
-	}
-
-	if alcohol_permission != "" {
-		if len(args) > 0 {
-			query += " AND alcohol_permission LIKE ?"
-		} else {
-			query += " WHERE alcohol_permission LIKE ?"
-		}
-		args = append(args, "%"+alcohol_permission+"%")
-	}
-
-	// Sahifani tartiblaymiz va limit qo‘shamiz
-	query += " ORDER BY id ASC LIMIT ? OFFSET ?"
-	args = append(args, limit, (page-1)*limit)
-
-	// So‘rovni bajarish
-	rows, err := r.db.QueryContext(ctx, query, args...)
+	// Qidiruv natijalarini olish
+	err = query.Offset((page - 1) * limit).Limit(limit).Find(&restaurants).Error
 	if err != nil {
-		return nil, 0, 0, err
-	}
-	defer rows.Close()
-
-	var restaurants []repo.Restaurant
-
-	// Natijalarni yig‘ish
-	for rows.Next() {
-		var restaurant repo.Restaurant
-		var createdAtStr,updatedAtstr string
-		err := rows.Scan(
-			&restaurant.Id,
-			&restaurant.Name,
-			&restaurant.Address,
-			&restaurant.Latitude,
-			&restaurant.Longitude,
-			&restaurant.PhoneNumber,
-			&restaurant.Email,
-			&restaurant.Capacity,
-			&restaurant.OwnerID,
-			&restaurant.OpeningHours,
-			&restaurant.ImageURL,
-			&restaurant.Description,
-			&restaurant.AlcoholPermission,
-			&restaurant.Status,
-			&createdAtStr,
-			&updatedAtstr,
-		)
-		if err != nil {
-			return nil, 0, 0, err
-		}
-		restaurant.CreatedAt, err = time.Parse("2006-01-02 15:04:05", createdAtStr)
-		if err != nil {
-			return nil, 0, 0, err
-		}
-		restaurant.UpdatedAt, err = time.Parse("2006-01-02 15:04:05", updatedAtstr)
-		if err != nil {
-			return nil, 0, 0, err
-		}
-		restaurants = append(restaurants, restaurant)
-	}
-
-	if err = rows.Err(); err != nil {
 		return nil, 0, 0, err
 	}
 
 	return restaurants, page, totalPages, nil
 }
 
-func (r *restaurantsRepo) GetByOwnerId(ctx context.Context, id, limit int) ([]repo.Restaurant, error) {
-	query := `
-		SELECT 
-			id, name, address,
-			latitude, longitude,
-			phone_number, email,
-			capacity, owner_id,
-			opening_hours, image_url,
-			description, alcohol_permission,
-			created_at, updated_at,
-			status
-		FROM restaurants 
-		WHERE owner_id = ?
-		LIMIT ?
-	`
-	rows, err := r.db.QueryContext(ctx, query, id, limit)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
+func (r *restaurantsRepo) GetByOwnerId(ctx context.Context, ownerID int, name string, limit int) ([]repo.Restaurant, error) {
 	var restaurants []repo.Restaurant
 
-	for rows.Next() {
-		var restaurant repo.Restaurant
-		var createdAtStr, updatedAtStr string
+	query := r.db.WithContext(ctx).Where("owner_id = ?", ownerID)
 
-		err := rows.Scan(
-			&restaurant.Id,
-			&restaurant.Name,
-			&restaurant.Address,
-			&restaurant.Latitude,
-			&restaurant.Longitude,
-			&restaurant.PhoneNumber,
-			&restaurant.Email,
-			&restaurant.Capacity,
-			&restaurant.OwnerID,
-			&restaurant.OpeningHours,
-			&restaurant.ImageURL,
-			&restaurant.Description,
-			&restaurant.AlcoholPermission,
-			&createdAtStr,
-			&updatedAtStr,
-			&restaurant.Status,
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		// Time parsing
-		restaurant.CreatedAt, err = time.Parse("2006-01-02 15:04:05", createdAtStr)
-		if err != nil {
-			return nil, err
-		}
-		restaurant.UpdatedAt, err = time.Parse("2006-01-02 15:04:05", updatedAtStr)
-		if err != nil {
-			return nil, err
-		}
-
-		restaurants = append(restaurants, restaurant)
+	if name != "" {
+		query = query.Where("name LIKE ?", "%"+name+"%")
 	}
 
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-
-	return restaurants, nil
+	result := query.Limit(limit).Find(&restaurants)
+	return restaurants, result.Error
 }
 
 func (r *restaurantsRepo) GetById(ctx context.Context, id int) (*repo.Restaurant, error) {
-	query := `
-		SELECT 
-			id, name, address,
-			latitude, longitude,
-			phone_number, email,
-			capacity, owner_id,
-			opening_hours, image_url,
-			description, alcohol_permission,
-			created_at, updated_at,
-			status
-		FROM restaurants 
-		WHERE id = ?
-	`
 	var restaurant repo.Restaurant
-	var createdAtStr, updatedAtStr string
-	err := r.db.QueryRowContext(ctx, query, id).Scan(
-		&restaurant.Id,
-		&restaurant.Name,
-		&restaurant.Address,
-		&restaurant.Latitude,
-		&restaurant.Longitude,
-		&restaurant.PhoneNumber,
-		&restaurant.Email,
-		&restaurant.Capacity,
-		&restaurant.OwnerID,
-		&restaurant.OpeningHours,
-		&restaurant.ImageURL,
-		&restaurant.Description,
-		&restaurant.AlcoholPermission,
-		&createdAtStr,
-		&updatedAtStr,
-		&restaurant.Status,
-	)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, nil
-		}
-		return nil, err
+	result := r.db.WithContext(ctx).First(&restaurant, id)
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+		return nil, nil
 	}
-	restaurant.CreatedAt, err = time.Parse("2006-01-02 15:04:05", createdAtStr)
-	if err != nil {
-		return nil, err
-	}
-	restaurant.UpdatedAt, err = time.Parse("2006-01-02 15:04:05", updatedAtStr)
-	if err != nil {
-		return nil, err
-	}
-	return &restaurant, nil
+	return &restaurant, result.Error
 }
 
 func (r *restaurantsRepo) Update(ctx context.Context, id int, req *repo.UpdateRestaurant) error {
-	tx, err := r.db.Begin()
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			tx.Rollback()
-		}
-	}()
-	query := `
-		UPDATE restaurants SET 
-			name = ?,
-			address = ?,
-			latitude = ?,
-			longitude = ?,
-			phone_number = ?,
-			email = ?,
-			capacity = ?,
-			owner_id = ?,
-			opening_hours = ?,
-			image_url = ?,
-			description = ?,
-			alcohol_permission = ? 
-		WHERE id = ?
-	`
-	_, err = tx.ExecContext(
-		ctx, query, req.Name,
-		req.Address, req.Latitude,
-		req.Longitude, req.PhoneNumber,
-		req.Email, req.Capacity, req.OwnerID,
-		req.OpeningHours, req.ImageURL,
-		req.Description, req.AlcoholPermission, id,
-	)
-	if err != nil {
-		tx.Rollback()
-		return err
-	}
-
-	err = tx.Commit()
-	if err != nil {
-		return err
-	}
-	return nil
+	result := r.db.WithContext(ctx).Model(&repo.Restaurant{}).Where("id = ?", id).Updates(req)
+	return result.Error
 }
 
 func (r *restaurantsRepo) UpdateStatus(ctx context.Context, id int, status string) error {
-	tx, err := r.db.Begin()
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			tx.Rollback()
-		}
-	}()
-	query := `
-		UPDATE restaurants SET 
-			status = ?
-		WHERE id = ?
-	`
-	_, err = tx.ExecContext(
-		ctx, query, status, id,
-	)
-	if err != nil {
-		tx.Rollback()
-		return err
-	}
-
-	err = tx.Commit()
-	if err != nil {
-		return err
+	result := r.db.WithContext(ctx).Model(&repo.Restaurant{}).Where("id = ?", id).Update("status", status)
+	if result.Error != nil {
+		return result.Error
 	}
 	return nil
 }
 
 func (r *restaurantsRepo) Delete(ctx context.Context, id int) error {
-	tx, err := r.db.Begin()
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			tx.Rollback()
-		}
-	}()
-
-	query := `DELETE FROM restaurants WHERE id = ?`
-	_, err = tx.ExecContext(ctx, query, id)
-	if err != nil {
-		tx.Rollback()
-		return err
-	}
-	err = tx.Commit()
-	if err != nil {
-		return err
+	result := r.db.WithContext(ctx).Where("id = ?", id).Delete(&repo.Restaurant{})
+	if result.Error != nil {
+		return result.Error
 	}
 	return nil
 }

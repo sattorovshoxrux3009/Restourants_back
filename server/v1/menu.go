@@ -28,8 +28,9 @@ func saveMenuImage(c *fiber.Ctx, file *multipart.FileHeader) (string, error) {
 	return "/uploads/menu/" + newFileName, nil
 }
 
+// Create menu
 func (h *handlerV1) CreateSMenu(c *fiber.Ctx) error {
-	restaurantId, _ := strconv.Atoi(c.FormValue("restaurant_id"))
+	restaurantId, _ := strconv.Atoi(c.FormValue("restaurantid"))
 	price, _ := strconv.ParseFloat(c.FormValue("price"), 64)
 
 	restaurant, err := h.strg.Restaurants().GetById(c.Context(), restaurantId)
@@ -46,8 +47,8 @@ func (h *handlerV1) CreateSMenu(c *fiber.Ctx) error {
 		}
 	}
 
-	menu, err := h.strg.Menu().Create(c.Context(), &repo.CreateMenu{
-		RestaurantId: restaurantId,
+	menu, err := h.strg.Menu().Create(c.Context(), &repo.Menu{
+		RestaurantId: uint(restaurantId),
 		Name:         c.FormValue("name"),
 		Description:  c.FormValue("description"),
 		Price:        price,
@@ -56,6 +57,73 @@ func (h *handlerV1) CreateSMenu(c *fiber.Ctx) error {
 	})
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Internal server error"})
+	}
+
+	return c.Status(fiber.StatusCreated).JSON(menu)
+}
+
+func (h *handlerV1) CreateAMenu(c *fiber.Ctx) error {
+	// Admin ID ni olish
+	adminID, ok := c.Locals("admin_id").(uint)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Unauthorized"})
+	}
+	intID := int(adminID)
+
+	// Form ma’lumotlarini olish
+	restaurantId, _ := strconv.Atoi(c.FormValue("restaurantid"))
+	price, err := strconv.ParseFloat(c.FormValue("price"), 64)
+	name, description, category := c.FormValue("name"), c.FormValue("description"), c.FormValue("category")
+
+	// **Majburiy maydonlarni tekshirish**
+	if err != nil || name == "" || description == "" || category == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid input fields"})
+	}
+
+	// **Kategoriya tekshiruvi**
+	validCategories := map[string]bool{"first": true, "second": true, "salad": true, "dessert": true}
+	if !validCategories[category] {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid category"})
+	}
+
+	// **Admin restoranga egalik qiladimi?**
+	adminRestaurants, err := h.strg.Restaurants().GetByOwnerId(c.Context(), intID, "", 10)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Error fetching restaurants"})
+	}
+
+	access := false
+	for _, r := range adminRestaurants {
+		if r.Id == uint(restaurantId) {
+			access = true
+			break
+		}
+	}
+	if !access {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Access denied"})
+	}
+
+	// **Rasm yuklash**
+	file, err := c.FormFile("image")
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Image is required"})
+	}
+	imageURL, err := saveMenuImage(c, file)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Image upload failed"})
+	}
+
+	// **Menyu yaratish**
+	menu, err := h.strg.Menu().Create(c.Context(), &repo.Menu{
+		RestaurantId: uint(restaurantId),
+		Name:         name,
+		Description:  description,
+		Price:        price,
+		Category:     category,
+		ImageURL:     imageURL,
+	})
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Database error"})
 	}
 
 	return c.Status(fiber.StatusCreated).JSON(menu)
@@ -102,9 +170,9 @@ func (h *handlerV1) UpdateSMenu(c *fiber.Ctx) error {
 		req.Image = menu.ImageURL
 	}
 
-	newMenu, err := h.strg.Menu().Update(c.Context(), id, &repo.CreateMenu{
+	newMenu, err := h.strg.Menu().Update(c.Context(), id, &repo.Menu{
 		Name:         req.Name,
-		RestaurantId: req.RestaurantId,
+		RestaurantId: uint(req.RestaurantId),
 		Description:  req.Description,
 		ImageURL:     req.Image,
 		Category:     req.Category,
@@ -120,58 +188,7 @@ func (h *handlerV1) UpdateSMenu(c *fiber.Ctx) error {
 	})
 }
 
-func (h *handlerV1) GetMenu(c *fiber.Ctx) error {
-	menuId := c.Params("id")
-	if menuId != "" {
-		// ID bo‘yicha bitta menuni olish
-		id, err := strconv.Atoi(menuId)
-		if err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid menu ID"})
-		}
-
-		menu, err := h.strg.Menu().GetById(c.Context(), id)
-		if err != nil || menu == nil {
-			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Menu not found"})
-		}
-
-		// Vaqt maydonlarini bo‘sh qilish
-		menu.CreatedAt = time.Time{}
-		menu.UpdatedAt = time.Time{}
-
-		return c.JSON(menu)
-	}
-
-	// Query parametrlarini olish
-	page, _ := strconv.Atoi(c.Query("page", "1"))
-	limit, _ := strconv.Atoi(c.Query("limit", "20"))
-	if page < 1 {
-		page = 1
-	}
-	if limit < 1 {
-		limit = 20
-	}
-
-	name := c.Query("name")
-	category := c.Query("category")
-
-	menu, currentPage, totalPage, err := h.strg.Menu().GetAll(
-		c.Context(),
-		name,
-		category,
-		page,
-		limit,
-	)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to get menus"})
-	}
-
-	return c.JSON(fiber.Map{
-		"page":       currentPage,
-		"total_page": totalPage,
-		"menu":       menu,
-	})
-}
-
+// Get menu
 func (h *handlerV1) GetSMenu(c *fiber.Ctx) error {
 	menuId := c.Params("id")
 	if menuId != "" {
@@ -219,7 +236,156 @@ func (h *handlerV1) GetSMenu(c *fiber.Ctx) error {
 		page,
 		limit,
 	)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to get menus"})
+	}
 
+	return c.JSON(fiber.Map{
+		"page":       currentPage,
+		"total_page": totalPage,
+		"menu":       menu,
+	})
+}
+
+func (h *handlerV1) GetAMenu(c *fiber.Ctx) error {
+	// Admin ID olish
+	adminID, ok := c.Locals("admin_id").(uint)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Unauthorized"})
+	}
+	intID := int(adminID)
+
+	menuId := c.Params("id")
+	if menuId != "" {
+		id, err := strconv.Atoi(menuId)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid menu ID"})
+		}
+
+		// Menyu topish
+		menu, err := h.strg.Menu().GetById(c.Context(), id)
+		if err != nil || menu == nil {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Menu not found"})
+		}
+
+		// Adminning restoranlarini olish
+		adminRestaurants, err := h.strg.Restaurants().GetByOwnerId(c.Context(), intID, "", 10)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to get admin's restaurants"})
+		}
+
+		// Admin ushbu menyu restoraniga egalik qiladimi?
+		access := false
+		for _, r := range adminRestaurants {
+			if r.Id == menu.RestaurantId {
+				access = true
+				break
+			}
+		}
+
+		// Agar admin ushbu restoranga ega bo'lmasa, 403 qaytaramiz
+		if !access {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Access denied"})
+		}
+
+		return c.JSON(menu)
+	}
+
+	// Query parametrlarini olish
+	page, _ := strconv.Atoi(c.Query("page", "1"))
+	limit, _ := strconv.Atoi(c.Query("limit", "20"))
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 {
+		limit = 20
+	}
+
+	name := c.Query("name")
+	category := c.Query("category")
+
+	// Adminning restoranlarini olish
+	adminRestaurants, err := h.strg.Restaurants().GetByOwnerId(c.Context(), intID, "", 10)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to get admin's restaurants"})
+	}
+
+	// Agar adminda hech qanday restorani bo'lmasa, bo'sh menyu qaytaramiz
+	if len(adminRestaurants) == 0 {
+		return c.JSON(fiber.Map{
+			"page":       page,
+			"total_page": 0,
+			"menu":       []repo.Menu{},
+		})
+	}
+
+	// Adminning restoranlarining ID larini yig‘amiz
+	var restaurantIDs []uint
+	for _, r := range adminRestaurants {
+		restaurantIDs = append(restaurantIDs, uint(r.Id))
+	}
+
+	// Faqat adminning restoranlaridan menyularni olish
+	menu, currentPage, totalPage, err := h.strg.Menu().GetSAllByRestaurants(
+		c.Context(),
+		name,
+		category,
+		restaurantIDs, // faqat adminning restoranlari
+		page,
+		limit,
+	)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to get menus"})
+	}
+
+	return c.JSON(fiber.Map{
+		"page":       currentPage,
+		"total_page": totalPage,
+		"menu":       menu,
+	})
+}
+
+func (h *handlerV1) GetMenu(c *fiber.Ctx) error {
+	menuId := c.Params("id")
+	if menuId != "" {
+		// ID bo‘yicha bitta menuni olish
+		id, err := strconv.Atoi(menuId)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid menu ID"})
+		}
+
+		menu, err := h.strg.Menu().GetById(c.Context(), id)
+		if err != nil || menu == nil {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Menu not found"})
+		}
+
+		// Vaqt maydonlarini bo‘sh qilish
+		menu.CreatedAt = time.Time{}
+		menu.UpdatedAt = time.Time{}
+
+		return c.JSON(menu)
+	}
+
+	// Query parametrlarini olish
+	page, _ := strconv.Atoi(c.Query("page", "1"))
+	limit, _ := strconv.Atoi(c.Query("limit", "20"))
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 {
+		limit = 20
+	}
+
+	name := c.Query("name")
+	category := c.Query("category")
+
+	menu, currentPage, totalPage, err := h.strg.Menu().GetAll(
+		c.Context(),
+		name,
+		category,
+		page,
+		limit,
+	)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to get menus"})
 	}

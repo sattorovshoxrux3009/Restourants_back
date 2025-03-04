@@ -27,13 +27,26 @@ func (h *handlerV1) CreateAdmin(ctx *fiber.Ctx) error {
 		return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Error hashing password"})
 	}
 
-	admin, err := h.strg.Admin().Create(ctx.Context(), &repo.CreateAdmin{
+	admin, err := h.strg.Admin().Create(ctx.Context(), &repo.Admin{
 		FirstName:    req.FirstName,
 		LastName:     req.LastName,
 		Email:        req.Email,
 		PhoneNumber:  req.PhoneNumber,
 		Username:     req.Username,
 		PasswordHash: string(hashedPassword),
+	})
+	if err != nil {
+		log.Println(err)
+		return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Internal server error :("})
+	}
+	newAdmin, err := h.strg.Admin().GetByUsername(ctx.Context(), req.Username)
+	if err != nil {
+		log.Println(err)
+		return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Internal server error :("})
+	}
+	_, err = h.strg.AdminRestaurantsLimit().Create(ctx.Context(), &repo.AdminRestaurantLimit{
+		AdminId:        newAdmin.Id,
+		MaxRestaurants: 1,
 	})
 	if err != nil {
 		log.Println(err)
@@ -112,6 +125,17 @@ func (h *handlerV1) UpdateAdmin(ctx *fiber.Ctx) error {
 		if err := h.strg.Admin().UpdateStatus(ctx.Context(), id, status); err != nil {
 			return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to update admin status"})
 		}
+		rest, err := h.strg.Restaurants().GetByOwnerId(ctx.Context(), id, "", 20)
+		if err != nil {
+			return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to get restaurants"})
+		}
+
+		for _, r := range rest {
+			if err := h.strg.Restaurants().UpdateStatus(ctx.Context(), int(r.Id), status); err != nil {
+				return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to update restaurant status"})
+			}
+		}
+
 		return ctx.JSON(fiber.Map{"message": "Admin status updated successfully"})
 
 	case "limit":
@@ -119,8 +143,8 @@ func (h *handlerV1) UpdateAdmin(ctx *fiber.Ctx) error {
 		if !ok {
 			return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid limit format"})
 		}
-		err := h.strg.AdminRestaurantsLimit().Update(ctx.Context(), &repo.CreateAdminRestaurantsLimit{
-			AdminId:        id,
+		err := h.strg.AdminRestaurantsLimit().Update(ctx.Context(), &repo.AdminRestaurantLimit{
+			AdminId:        uint(id),
 			MaxRestaurants: int(limit),
 		})
 		if err != nil {
@@ -181,16 +205,15 @@ func (h *handlerV1) GetAdminDetails(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Limit does not exist"})
 	}
 
-	restaurants, err := h.strg.Restaurants().GetByOwnerId(c.Context(), admin.Id, limit.MaxRestaurants)
+	restaurants, err := h.strg.Restaurants().GetByOwnerId(c.Context(), intID, "", limit.MaxRestaurants)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Error fetching admin restaurants"})
 	}
 
-	limits, err := h.strg.AdminRestaurantsLimit().GetByAdminId(c.Context(), admin.Id)
+	limits, err := h.strg.AdminRestaurantsLimit().GetByAdminId(c.Context(), int(admin.Id))
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Error fetching admin limits"})
 	}
-
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"admin":             admin,
 		"admin_logins":      adminLogins,
@@ -221,18 +244,74 @@ func (h *handlerV1) DeleteAdmin(c *fiber.Ctx) error {
 
 func (h *handlerV1) GetProfile(c *fiber.Ctx) error {
 	adminID := c.Locals("admin_id")
-	intID, ok := adminID.(int)
+	uintID, ok := adminID.(uint)
 	if !ok {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Unauthorized"})
 	}
-
+	intID := int(uintID)
 	admin, err := h.strg.Admin().GetById(c.Context(), intID)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Internal server error"})
 	}
-
 	admin.PasswordHash = ""
 	return c.Status(fiber.StatusOK).JSON(admin)
+
+}
+
+func (h *handlerV1) UpdateProfile(c *fiber.Ctx) error {
+	// Admin ID olish
+	adminID := c.Locals("admin_id")
+	uintID, ok := adminID.(uint)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Unauthorized"})
+	}
+	intID := int(uintID)
+
+	// Request body ni parse qilish
+	var req models.UpdateAdmin
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid input"})
+	}
+
+	// Adminni bazadan olish
+	admin, err := h.strg.Admin().GetById(c.Context(), intID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to get admin"})
+	}
+
+	// Agar foydalanuvchi parolni o‘zgartirmoqchi bo‘lsa, eski parolni tekshirish
+	var hashedPassword string
+	if len(req.NewPassword) < 4 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Password must be 4 character minimum"})
+	}
+	if req.OldPassword != "" && req.NewPassword != "" {
+		if err := bcrypt.CompareHashAndPassword([]byte(admin.PasswordHash), []byte(req.OldPassword)); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid old password"})
+		}
+		hashedBytes, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Error hashing password"})
+		}
+		hashedPassword = string(hashedBytes)
+	} else {
+		// Agar yangi parol berilmagan bo‘lsa, eski parolni ishlatish
+		hashedPassword = admin.PasswordHash
+	}
+
+	// Admin profilini yangilash
+	err = h.strg.Admin().Update(c.Context(), intID, &repo.UpdateAdmin{
+		FirstName:    req.FirstName,
+		Email:        req.Email,
+		PhoneNumber:  req.PhoneNumber,
+		LastName:     req.LastName,
+		Username:     admin.Username,
+		PasswordHash: hashedPassword,
+	})
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to update profile"})
+	}
+
+	return c.JSON(fiber.Map{"message": "Profile updated successfully"})
 }
 
 // package v1

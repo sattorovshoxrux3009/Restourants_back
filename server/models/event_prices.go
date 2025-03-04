@@ -1,6 +1,6 @@
 package models
 
-type EventPrices struct {
+type EventPrice struct {
 	Id                int     `json:"id"`
 	RestaurantId      int     `json:"restaurant_id"`
 	EventType         string  `json:"event_type"`

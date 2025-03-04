@@ -17,7 +17,7 @@ import (
 func saveImage(ctx *fiber.Ctx, file *multipart.FileHeader) (string, error) {
 	fileExtension := filepath.Ext(file.Filename)
 	newFileName := fmt.Sprintf("%s%s", uuid.New().String(), fileExtension)
-	dst := filepath.Join("uploads", "restourants", newFileName)
+	dst := filepath.Join("uploads", "restaurants", newFileName)
 
 	if err := os.MkdirAll(filepath.Dir(dst), os.ModePerm); err != nil {
 		return "", err
@@ -27,12 +27,13 @@ func saveImage(ctx *fiber.Ctx, file *multipart.FileHeader) (string, error) {
 		return "", err
 	}
 
-	imageURL := "/uploads/restourants/" + newFileName
+	imageURL := "/uploads/restaurants/" + newFileName
 	return imageURL, nil
 }
 
-func (h *handlerV1) CreateRestaurant(c *fiber.Ctx) error {
-	var req models.CreateRestourants
+// Create Restaurants
+func (h *handlerV1) CreateSRestaurant(c *fiber.Ctx) error {
+	var req models.Restourants
 
 	req.Name = c.FormValue("name")
 	req.Address = c.FormValue("address")
@@ -41,26 +42,26 @@ func (h *handlerV1) CreateRestaurant(c *fiber.Ctx) error {
 	req.PhoneNumber = c.FormValue("phone_number")
 	req.Email = c.FormValue("email")
 	req.Capacity, _ = strconv.Atoi(c.FormValue("capacity"))
-	req.OwnerID, _ = strconv.Atoi(c.FormValue("owner_id"))
+	req.OwnerId, _ = strconv.Atoi(c.FormValue("owner_id"))
 	req.OpeningHours = c.FormValue("opening_hours")
 	req.Description = c.FormValue("description")
 	req.AlcoholPermission, _ = strconv.ParseBool(c.FormValue("alcohol_permission"))
 
-	admin, err := h.strg.Admin().GetById(c.Context(), req.OwnerID)
+	admin, err := h.strg.Admin().GetById(c.Context(), req.OwnerId)
 	if err != nil || admin == nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Owner ID does not exist",
 		})
 	}
 
-	limit, err := h.strg.AdminRestaurantsLimit().GetByAdminId(c.Context(), req.OwnerID)
+	limit, err := h.strg.AdminRestaurantsLimit().GetByAdminId(c.Context(), req.OwnerId)
 	if err != nil || limit == nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Limit does not exist",
 		})
 	}
 
-	ownerRestaurants, err := h.strg.Restaurants().GetByOwnerId(c.Context(), req.OwnerID, limit.MaxRestaurants)
+	ownerRestaurants, err := h.strg.Restaurants().GetByOwnerId(c.Context(), req.OwnerId, "", limit.MaxRestaurants)
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Error getting owner restaurants for limit",
@@ -81,10 +82,10 @@ func (h *handlerV1) CreateRestaurant(c *fiber.Ctx) error {
 				"error": "Error saving image",
 			})
 		}
-		req.Image = imageURL
+		req.ImageURL = imageURL
 	}
 
-	_, err = h.strg.Restaurants().Create(c.Context(), &repo.CreateRestaurant{
+	_, err = h.strg.Restaurants().Create(c.Context(), &repo.Restaurant{
 		Name:              req.Name,
 		Address:           req.Address,
 		Latitude:          req.Latitude,
@@ -92,9 +93,9 @@ func (h *handlerV1) CreateRestaurant(c *fiber.Ctx) error {
 		PhoneNumber:       req.PhoneNumber,
 		Email:             req.Email,
 		Capacity:          req.Capacity,
-		OwnerID:           req.OwnerID,
+		OwnerId:           uint(req.OwnerId),
 		OpeningHours:      req.OpeningHours,
-		ImageURL:          req.Image,
+		ImageURL:          req.ImageURL,
 		Description:       req.Description,
 		AlcoholPermission: req.AlcoholPermission,
 	})
@@ -110,7 +111,217 @@ func (h *handlerV1) CreateRestaurant(c *fiber.Ctx) error {
 	})
 }
 
-func (h *handlerV1) GetRestourants(c *fiber.Ctx) error {
+func (h *handlerV1) CreateARestaurant(c *fiber.Ctx) error {
+	// Admin ID olish
+	adminID := c.Locals("admin_id")
+	uintID, ok := adminID.(uint)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Unauthorized"})
+	}
+	intID := int(uintID)
+
+	// Form-data o‘qish
+	var req models.Restourants
+	req.Name = c.FormValue("name")
+	req.Address = c.FormValue("address")
+	req.PhoneNumber = c.FormValue("phone_number")
+	req.Email = c.FormValue("email")
+	req.OpeningHours = c.FormValue("opening_hours")
+	req.Description = c.FormValue("description")
+
+	// Raqamli maydonlarni o‘qish va xatolikni tekshirish
+	var err error
+	req.Latitude, err = strconv.ParseFloat(c.FormValue("latitude"), 64)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid latitude"})
+	}
+	req.Longitude, err = strconv.ParseFloat(c.FormValue("longitude"), 64)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid longitude"})
+	}
+	req.Capacity, err = strconv.Atoi(c.FormValue("capacity"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid capacity"})
+	}
+	req.AlcoholPermission, err = strconv.ParseBool(c.FormValue("alcohol_permission"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid alcohol_permission"})
+	}
+
+	// Majburiy maydonlarni tekshirish
+	if req.Name == "" || req.Address == "" || req.PhoneNumber == "" || req.Email == "" || req.OpeningHours == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Missing required fields"})
+	}
+
+	// Adminning restoran yaratish limiti
+	req.OwnerId = intID
+	limit, err := h.strg.AdminRestaurantsLimit().GetByAdminId(c.Context(), req.OwnerId)
+	if err != nil || limit == nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Limit does not exist"})
+	}
+
+	// Adminning restoran sonini tekshirish
+	ownerRestaurants, err := h.strg.Restaurants().GetByOwnerId(c.Context(), req.OwnerId, "", limit.MaxRestaurants)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Error getting owner restaurants for limit"})
+	}
+
+	if len(ownerRestaurants) >= limit.MaxRestaurants {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "You have reached the maximum number of restaurants allowed."})
+	}
+
+	// Rasm yuklash
+	file, err := c.FormFile("image")
+	if err == nil && file != nil {
+		imageURL, err := saveImage(c, file)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Error saving image"})
+		}
+		req.ImageURL = imageURL
+	}
+
+	// Restoran yaratish
+	_, err = h.strg.Restaurants().Create(c.Context(), &repo.Restaurant{
+		Name:              req.Name,
+		Address:           req.Address,
+		Latitude:          req.Latitude,
+		Longitude:         req.Longitude,
+		PhoneNumber:       req.PhoneNumber,
+		Email:             req.Email,
+		Capacity:          req.Capacity,
+		OwnerId:           uint(req.OwnerId),
+		OpeningHours:      req.OpeningHours,
+		ImageURL:          req.ImageURL,
+		Description:       req.Description,
+		AlcoholPermission: req.AlcoholPermission,
+	})
+	if err != nil {
+		log.Println(err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Error creating restaurant"})
+	}
+
+	return c.Status(fiber.StatusCreated).JSON(fiber.Map{"message": "Restaurant created successfully"})
+}
+
+// Get Restaurants
+func (h *handlerV1) GetSRestaurants(c *fiber.Ctx) error {
+	restaurantID := c.Params("id")
+	if restaurantID != "" {
+		id, err := strconv.Atoi(restaurantID)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid restaurant ID"})
+		}
+
+		restaurant, err := h.strg.Restaurants().GetById(c.Context(), id)
+		if err != nil || restaurant == nil {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Restaurant not found"})
+		}
+		return c.JSON(restaurant)
+	}
+
+	page, _ := strconv.Atoi(c.Query("page", "1"))
+	limit, _ := strconv.Atoi(c.Query("limit", "10"))
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 {
+		limit = 10
+	}
+
+	status := c.Query("status")
+	phonenumber := c.Query("phonenumber")
+	email := c.Query("email")
+	ownerid := c.Query("ownerid")
+	name := c.Query("name")
+	address := c.Query("address")
+	capacity := c.Query("capacity")
+	alcoholPermission := c.Query("alcoholpermission")
+
+	restaurants, currentPage, totalPage, err := h.strg.Restaurants().GetSall(
+		c.Context(),
+		status,
+		phonenumber,
+		email,
+		ownerid,
+		name,
+		address,
+		capacity,
+		alcoholPermission,
+		page,
+		limit,
+	)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to get restaurants"})
+	}
+
+	return c.JSON(fiber.Map{
+		"page":        currentPage,
+		"total_page":  totalPage,
+		"restaurants": restaurants,
+	})
+}
+
+func (h *handlerV1) GetSRestaurantDetails(c *fiber.Ctx) error {
+	restaurantID := c.Params("id")
+	id, err := strconv.Atoi(restaurantID)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid restaurant ID"})
+	}
+
+	restaurant, err := h.strg.Restaurants().GetById(c.Context(), id)
+	if err != nil || restaurant == nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Restaurant not found"})
+	}
+
+	restaurantMenu, err := h.strg.Menu().GetByRestaurantId(c.Context(), id)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to get restaurant menu"})
+	}
+
+	return c.JSON(fiber.Map{
+		"restaurant":      restaurant,
+		"restaurant_menu": restaurantMenu,
+	})
+}
+
+func (h *handlerV1) GetARestaurants(c *fiber.Ctx) error {
+	// Admin ID olish
+	adminID := c.Locals("admin_id")
+	uintID, ok := adminID.(uint)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Unauthorized"})
+	}
+	intID := int(uintID)
+	idParam := c.Params("id")
+	if idParam != "" {
+		id, err := strconv.Atoi(idParam)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid ID"})
+		}
+		restaurant, err := h.strg.Restaurants().GetById(c.Context(), id)
+		if err != nil {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Restaurant not found"})
+		}
+		if int(restaurant.OwnerId) != intID {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Access denied"})
+		}
+		restaurant.Status = ""
+		return c.Status(fiber.StatusOK).JSON(fiber.Map{"restaurant": restaurant})
+	}
+	name := c.Query("name")
+	restaurants, err := h.strg.Restaurants().GetByOwnerId(c.Context(), intID, name, 10)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Internal server error :("})
+	}
+	for i := range restaurants {
+		restaurants[i].Status = ""
+	}
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"restaurants": restaurants,
+	})
+}
+
+func (h *handlerV1) GetRestaurants(c *fiber.Ctx) error {
 	restaurantID := c.Params("id")
 	if restaurantID != "" {
 		// ID bo‘yicha bitta restoranni olish
@@ -164,94 +375,8 @@ func (h *handlerV1) GetRestourants(c *fiber.Ctx) error {
 	})
 }
 
-func (h *handlerV1) GetSRestourants(c *fiber.Ctx) error {
-	restaurantID := c.Params("id")
-	if restaurantID != "" {
-		id, err := strconv.Atoi(restaurantID)
-		if err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid restaurant ID"})
-		}
-
-		restaurant, err := h.strg.Restaurants().GetById(c.Context(), id)
-		if err != nil || restaurant == nil {
-			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Restaurant not found"})
-		}
-		return c.JSON(restaurant)
-	}
-
-	page, _ := strconv.Atoi(c.Query("page", "1"))
-	limit, _ := strconv.Atoi(c.Query("limit", "10"))
-	if page < 1 {
-		page = 1
-	}
-	if limit < 1 {
-		limit = 10
-	}
-
-	status := c.Query("status")
-	phonenumber := c.Query("phonenumber")
-	email := c.Query("email")
-	ownerid := c.Query("ownerid")
-	name := c.Query("name")
-	address := c.Query("address")
-	capacity := c.Query("capacity")
-	alcoholPermission := c.Query("alcoholpermission")
-
-	restaurants, currentPage, totalPage, err := h.strg.Restaurants().GetSall(
-		c.Context(),
-		status,
-		phonenumber,
-		email,
-		ownerid,
-		name,
-		address,
-		capacity,
-		alcoholPermission,
-		page,
-		limit,
-	)
-	if err != nil {
-		fmt.Println(err)
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to get restaurants"})
-	}
-
-	return c.JSON(fiber.Map{
-		"page":        currentPage,
-		"total_page":  totalPage,
-		"restaurants": restaurants,
-	})
-}
-
-func (h *handlerV1) UpdateRestaurantStatus(c *fiber.Ctx) error {
-	restaurantID := c.Params("id")
-	if restaurantID == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Restaurant ID is required"})
-	}
-
-	id, err := strconv.Atoi(restaurantID)
-	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid restaurant ID"})
-	}
-
-	var requestBody models.UpdateRestaurantStatus
-	if err := c.BodyParser(&requestBody); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request body"})
-	}
-
-	restaurant, err := h.strg.Restaurants().GetById(c.Context(), id)
-	if err != nil || restaurant == nil {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Restaurant not found"})
-	}
-
-	err = h.strg.Restaurants().UpdateStatus(c.Context(), id, requestBody.Status)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to update restaurant status"})
-	}
-
-	return c.JSON(fiber.Map{"message": "Restaurant status updated successfully"})
-}
-
-func (h *handlerV1) UpdateRestaurant(c *fiber.Ctx) error {
+// Update Restaurants
+func (h *handlerV1) UpdateSRestaurant(c *fiber.Ctx) error {
 	restaurantID := c.Params("id")
 	if restaurantID == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Restaurant ID is required"})
@@ -322,11 +447,20 @@ func (h *handlerV1) UpdateRestaurant(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"message": "Restaurant updated successfully"})
 }
 
-func (h *handlerV1) GetSRestaurantDetails(c *fiber.Ctx) error {
+func (h *handlerV1) UpdateSRestaurantStatus(c *fiber.Ctx) error {
 	restaurantID := c.Params("id")
+	if restaurantID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Restaurant ID is required"})
+	}
+
 	id, err := strconv.Atoi(restaurantID)
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid restaurant ID"})
+	}
+
+	var requestBody models.UpdateRestaurantStatus
+	if err := c.BodyParser(&requestBody); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request body"})
 	}
 
 	restaurant, err := h.strg.Restaurants().GetById(c.Context(), id)
@@ -334,18 +468,97 @@ func (h *handlerV1) GetSRestaurantDetails(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Restaurant not found"})
 	}
 
-	restaurantMenu, err := h.strg.Menu().GetByRestourantId(c.Context(), id)
+	err = h.strg.Restaurants().UpdateStatus(c.Context(), id, requestBody.Status)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to get restaurant menu"})
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to update restaurant status"})
 	}
 
-	return c.JSON(fiber.Map{
-		"restaurant":      restaurant,
-		"restaurant_menu": restaurantMenu,
-	})
+	return c.JSON(fiber.Map{"message": "Restaurant status updated successfully"})
 }
 
-func (h *handlerV1) DeleteRestaurant(c *fiber.Ctx) error {
+func (h *handlerV1) UpdateARestauranats(c *fiber.Ctx) error {
+	adminID := c.Locals("admin_id")
+	uintID, ok := adminID.(uint)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Unauthorized"})
+	}
+	intID := int(uintID)
+
+	restaurantID := c.Params("id")
+	if restaurantID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Restaurant ID is required"})
+	}
+
+	id, err := strconv.Atoi(restaurantID)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid restaurant ID"})
+	}
+
+	// Restoranni bazadan olish
+	restaurant, err := h.strg.Restaurants().GetById(c.Context(), id)
+	if err != nil || restaurant == nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Restaurant not found"})
+	}
+
+	// Faqat admin o‘z restoranini yangilashi mumkin
+	if restaurant.OwnerId != uint(intID) {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Access denied"})
+	}
+
+	// Form-data dan ma'lumotlarni olish
+	var req models.UpdateRestaurants
+	req.Name = c.FormValue("name")
+	req.Address = c.FormValue("address")
+	req.Latitude, _ = strconv.ParseFloat(c.FormValue("latitude"), 64)
+	req.Longitude, _ = strconv.ParseFloat(c.FormValue("longitude"), 64)
+	req.PhoneNumber = c.FormValue("phone_number")
+	req.Email = c.FormValue("email")
+	req.Capacity, _ = strconv.Atoi(c.FormValue("capacity"))
+	req.OpeningHours = c.FormValue("opening_hours")
+	req.Description = c.FormValue("description")
+	req.AlcoholPermission, _ = strconv.ParseBool(c.FormValue("alcohol_permission"))
+
+	// Yangi rasm bor yoki yo‘qligini tekshirish
+	file, err := c.FormFile("image")
+	if err == nil {
+		// Eski rasmni o‘chirish
+		if restaurant.ImageURL != "" {
+			oldImagePath := filepath.Join("uploads", "restaurants", filepath.Base(restaurant.ImageURL))
+			_ = os.Remove(oldImagePath)
+		}
+
+		// Yangi rasmni saqlash
+		imageURL, err := saveImage(c, file)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Error saving new image"})
+		}
+		req.ImageURL = imageURL
+	} else {
+		req.ImageURL = restaurant.ImageURL // Agar yangi rasm kelmasa, eski rasmni saqlaymiz
+	}
+
+	err = h.strg.Restaurants().Update(c.Context(), id, &repo.UpdateRestaurant{
+		Name:              req.Name,
+		Address:           req.Address,
+		Latitude:          req.Latitude,
+		Longitude:         req.Longitude,
+		PhoneNumber:       req.PhoneNumber,
+		Email:             req.Email,
+		Capacity:          req.Capacity,
+		OpeningHours:      req.OpeningHours,
+		ImageURL:          req.ImageURL,
+		Description:       req.Description,
+		AlcoholPermission: req.AlcoholPermission,
+	})
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to update restaurant"})
+	}
+
+	return c.JSON(fiber.Map{"message": "Restaurant updated successfully"})
+}
+
+// Delete Restaurants
+func (h *handlerV1) DeleteSRestaurant(c *fiber.Ctx) error {
 	restaurantID := c.Params("id")
 	if restaurantID == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Restaurant ID is required"})
@@ -374,6 +587,36 @@ func (h *handlerV1) DeleteRestaurant(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"message": "Restaurant deleted successfully"})
 }
 
+func (h *handlerV1) DeleteARestaurants(c *fiber.Ctx) error {
+	// Admin ID olish
+	adminID := c.Locals("admin_id")
+	uintID, ok := adminID.(uint)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Unauthorized"})
+	}
+	intID := int(uintID)
+	idParam := c.Params("id")
+	id, err := strconv.Atoi(idParam)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid ID"})
+	}
+	restaurant, err := h.strg.Restaurants().GetById(c.Context(), id)
+	if err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Restaurant not found"})
+	}
+	if int(restaurant.OwnerId) != intID {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Access denied"})
+	}
+	if restaurant.ImageURL != "" {
+		ImagePath := filepath.Join("uploads", "restaurants", filepath.Base(restaurant.ImageURL))
+		_ = os.Remove(ImagePath)
+	}
+	err = h.strg.Restaurants().Delete(c.Context(), id)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Internal server error :("})
+	}
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{"message": "Restaurant delete successfuly"})
+}
 
 // package v1
 

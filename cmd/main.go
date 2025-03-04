@@ -1,20 +1,24 @@
 package main
 
 import (
-	"database/sql"
 	"fmt"
 	"log"
 
-	_ "github.com/go-sql-driver/mysql"
 	"github.com/sattorovshoxrux3009/Restourants_back/config"
 	"github.com/sattorovshoxrux3009/Restourants_back/server"
 	"github.com/sattorovshoxrux3009/Restourants_back/storage"
+	"github.com/sattorovshoxrux3009/Restourants_back/storage/repo" // Modellarni chaqiramiz
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
+	"gorm.io/gorm/schema"
+	// "gorm.io/gorm/logger"
 )
 
 func main() {
 	cfg := config.Load(".")
 	// fmt.Println(cfg)
-	mysqlUrl := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s",
+
+	mysqlUrl := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local",
 		cfg.Mysql.User,     // Foydalanuvchi nomi
 		cfg.Mysql.Password, // Parol
 		cfg.Mysql.Host,     // Host (masalan, "localhost")
@@ -22,19 +26,35 @@ func main() {
 		cfg.Mysql.Database, // Ma'lumotlar bazasi nomi
 	)
 
-	mysqlConn, err := sql.Open("mysql", mysqlUrl)
+	// GORM bilan ulanish
+	mysqlConn, err := gorm.Open(mysql.Open(mysqlUrl), &gorm.Config{
+		NamingStrategy: schema.NamingStrategy{
+			SingularTable: true, // Jadvallarni ko‘plik shaklida yaratmasin
+		},
+		// Logger: logger.Default.LogMode(logger.Silent),
+	})
+
 	if err != nil {
 		log.Fatal("Error opening database connection: ", err)
 	}
-	defer mysqlConn.Close() // Dastur tugagach ulanishni yopish
 
-	// Ulanishni tekshirish
-	err = mysqlConn.Ping()
+	log.Println("Connection success!")
+
+	// AutoMigrate qilish
+	err = mysqlConn.AutoMigrate(
+		&repo.Restaurant{},
+		&repo.Admin{},
+		&repo.EventPrice{},
+		&repo.Menu{},
+		&repo.Token{},
+		&repo.SuperAdmin{},
+		&repo.AdminRestaurantLimit{},
+	)
 	if err != nil {
-		log.Fatal("Error connecting to the database: ", err)
-	} else {
-		log.Println("Connection sucss")
+		log.Fatal("Migrationda xatolik:", err)
 	}
+
+	fmt.Println("Migration muvaffaqiyatli yakunlandi!")
 
 	strg := storage.NewStorage(mysqlConn)
 
@@ -45,12 +65,4 @@ func main() {
 	if err := router.Listen(cfg.Port); err != nil {
 		log.Fatal("Error starting server: ", err)
 	}
-
-	// router := server.NewServer(&server.Options{
-	// 	Strg: strg,
-	// })
-
-	// if err = router.Run(cfg.Port); err != nil {
-	// 	log.Fatal("Error starting server: ", err)
-	// }
 }
