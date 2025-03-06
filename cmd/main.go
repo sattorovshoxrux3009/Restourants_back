@@ -11,7 +11,7 @@ import (
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/schema"
-	// "gorm.io/gorm/logger"
+	"gorm.io/gorm/logger"
 )
 
 func main() {
@@ -31,7 +31,7 @@ func main() {
 		NamingStrategy: schema.NamingStrategy{
 			SingularTable: true, // Jadvallarni ko‘plik shaklida yaratmasin
 		},
-		// Logger: logger.Default.LogMode(logger.Silent),
+		Logger: logger.Default.LogMode(logger.Silent),
 	})
 
 	if err != nil {
@@ -62,7 +62,7 @@ func main() {
 		Strg: strg,
 	})
 
-	if err := router.Listen(cfg.Port); err != nil {
+	if err := router.Listen("127.0.0.1" + cfg.Port); err != nil {
 		log.Fatal("Error starting server: ", err)
 	}
 }

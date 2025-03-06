@@ -7,6 +7,7 @@ type EventPricesI interface {
 	GetAll(ctx context.Context, restaurantID, eventType string, page, limit int) ([]*EventPrice, int, int, error)
 	GetByID(ctx context.Context, id int) (*EventPrice, error)
 	GetByRestaurantID(ctx context.Context, restaurantID int) ([]*EventPrice, error)
+	GetAllByRestaurantIDs(ctx context.Context, restaurantMap map[int]bool, eventType string, page, limit int) ([]EventPrice, int, int, error)
 	Update(ctx context.Context, event *EventPrice) error
 	Delete(ctx context.Context, id int) error
 }
@@ -54,5 +55,5 @@ type EventPrice struct {
 	TableSeats        int        `gorm:"not null"`
 	MaxWaiters        int        `gorm:"not null"`
 	AlcoholPermission bool       `gorm:"not null"`
-	Restaurant        Restaurant `gorm:"foreignKey:RestaurantId;constraint:OnDelete:CASCADE"`
+	Restaurant        Restaurant `json:"-" gorm:"foreignKey:RestaurantId;constraint:OnDelete:CASCADE"`
 }

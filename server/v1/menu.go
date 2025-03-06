@@ -2,10 +2,12 @@ package v1
 
 import (
 	"fmt"
+	"log"
 	"mime/multipart"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -15,7 +17,20 @@ import (
 )
 
 func saveMenuImage(c *fiber.Ctx, file *multipart.FileHeader) (string, error) {
-	fileExtension := filepath.Ext(file.Filename)
+	const maxFileSize = 5 * 1024 * 1024 // 10MB
+	var allowedExtensions = map[string]bool{
+		".jpg":  true,
+		".jpeg": true,
+		".png":  true,
+		".webp": true,
+	}
+	if file.Size > maxFileSize {
+		return "", fmt.Errorf("file size too large, maximum allowed size is 5MB")
+	}
+	fileExtension := strings.ToLower(filepath.Ext(file.Filename))
+	if !allowedExtensions[fileExtension] {
+		return "", fmt.Errorf("invalid file type, only JPG, JPEG, PNG, and WEBP are allowed")
+	}
 	newFileName := fmt.Sprintf("%s%s", uuid.New().String(), fileExtension)
 	dst := filepath.Join("uploads", "menu", newFileName)
 	err := os.MkdirAll(filepath.Dir(dst), os.ModePerm)
@@ -129,6 +144,7 @@ func (h *handlerV1) CreateAMenu(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusCreated).JSON(menu)
 }
 
+// Update menu
 func (h *handlerV1) UpdateSMenu(c *fiber.Ctx) error {
 	menuId := c.Params("id")
 	if menuId == "" {
@@ -159,7 +175,13 @@ func (h *handlerV1) UpdateSMenu(c *fiber.Ctx) error {
 		// Eski rasmni o'chirish
 		if menu.ImageURL != "" {
 			oldImagePath := filepath.Join("uploads", "menu", filepath.Base(menu.ImageURL))
-			_ = os.Remove(oldImagePath)
+			go func() {
+				time.Sleep(2 * time.Second)
+				err := os.Remove(oldImagePath)
+				if err != nil {
+					log.Fatal("Faylni o'chirishda xatolik:", err)
+				}
+			}()
 		}
 		imageURL, err := saveMenuImage(c, file)
 		if err != nil {
@@ -173,6 +195,86 @@ func (h *handlerV1) UpdateSMenu(c *fiber.Ctx) error {
 	newMenu, err := h.strg.Menu().Update(c.Context(), id, &repo.Menu{
 		Name:         req.Name,
 		RestaurantId: uint(req.RestaurantId),
+		Description:  req.Description,
+		ImageURL:     req.Image,
+		Category:     req.Category,
+		Price:        req.Price,
+	})
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to update menu"})
+	}
+
+	return c.JSON(fiber.Map{
+		"message": "Menu updated successfully",
+		"menu":    newMenu,
+	})
+}
+
+func (h *handlerV1) UpdateAMenu(c *fiber.Ctx) error {
+	adminID, ok := c.Locals("admin_id").(uint)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Unauthorized"})
+	}
+	intID := int(adminID)
+	menuId := c.Params("id")
+	if menuId == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Menu ID is required"})
+	}
+
+	id, err := strconv.Atoi(menuId)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid menu ID"})
+	}
+
+	// Menuni bazadan olish
+	menu, err := h.strg.Menu().GetById(c.Context(), id)
+	if err != nil || menu == nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Menu not found"})
+	}
+	adminRestaurants, err := h.strg.Restaurants().GetByOwnerId(c.Context(), intID, "", 10)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Error fetching restaurants"})
+	}
+
+	access := false
+	for _, r := range adminRestaurants {
+		if r.Id == menu.RestaurantId {
+			access = true
+			break
+		}
+	}
+	if !access {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Access denied"})
+	}
+
+	// Form-data dan ma'lumotlarni olish
+	var req models.CreateMenu
+	req.Name = c.FormValue("name")
+	req.Description = c.FormValue("description")
+	req.Price, _ = strconv.ParseFloat(c.FormValue("price"), 64)
+	req.Category = c.FormValue("category")
+
+	file, err := c.FormFile("image")
+	if err == nil {
+		// Eski rasmni o'chirish
+		if menu.ImageURL != "" {
+			oldImagePath := filepath.Join("uploads", "menu", filepath.Base(menu.ImageURL))
+			_ = os.Remove(oldImagePath)
+		}
+		imageURL, err := saveMenuImage(c, file)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": fmt.Sprintf("Error saving new image: %v", err),
+			})
+		}
+		req.Image = imageURL
+	} else {
+		req.Image = menu.ImageURL
+	}
+
+	newMenu, err := h.strg.Menu().Update(c.Context(), id, &repo.Menu{
+		Name:         req.Name,
+		RestaurantId: uint(menu.RestaurantId),
 		Description:  req.Description,
 		ImageURL:     req.Image,
 		Category:     req.Category,
@@ -416,6 +518,59 @@ func (h *handlerV1) DeleteSMenu(c *fiber.Ctx) error {
 	err = h.strg.Menu().Delete(c.Context(), id)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Internal server error"})
+	}
+
+	return c.JSON(fiber.Map{"message": "Menu deleted successfully"})
+}
+
+func (h *handlerV1) DeleteAMenu(c *fiber.Ctx) error {
+	// ID ni olish va tekshirish
+	id, err := strconv.Atoi(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid menu ID format"})
+	}
+	// Admin ID ni olish
+	adminID, ok := c.Locals("admin_id").(uint)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Unauthorized"})
+	}
+
+	// Menyu ma'lumotlarini olish
+	menu, err := h.strg.Menu().GetById(c.Context(), id)
+	if err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Menu not found"})
+	}
+
+	// Adminning restoranlarini olish
+	adminRestaurants, err := h.strg.Restaurants().GetByOwnerId(c.Context(), int(adminID), "", 10)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Error fetching restaurants"})
+	}
+
+	// Restoranga egalik qilishni tekshirish
+	access := false
+	for _, r := range adminRestaurants {
+		if r.Id == uint(menu.RestaurantId) {
+			access = true
+			break
+		}
+	}
+	if !access {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Access denied"})
+	}
+
+	// Agar rasm bo'lsa, uni o'chirish
+	if menu.ImageURL != "" {
+		oldImagePath := filepath.Join("uploads", "menu", filepath.Base(menu.ImageURL))
+		if err := os.Remove(oldImagePath); err != nil && !os.IsNotExist(err) {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to delete image"})
+		}
+	}
+
+	// Menyuni o‘chirish
+	err = h.strg.Menu().Delete(c.Context(), id)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to delete menu"})
 	}
 
 	return c.JSON(fiber.Map{"message": "Menu deleted successfully"})

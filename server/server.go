@@ -106,14 +106,20 @@ func NewServer(opts *Options) *fiber.App {
 		admin.Get("/profile", handler.GetProfile)
 		admin.Get("/restaurants/:id?", handler.GetARestaurants)
 		admin.Get("/menu/:id?", handler.GetAMenu)
+		admin.Get("/event-prices/:id?", handler.GetAEventPrices)
 
 		admin.Put("/profile", handler.UpdateProfile)
 		admin.Put("/restaurants/:id", handler.UpdateARestauranats)
+		admin.Put("/menu/:id", handler.UpdateAMenu)
+		admin.Put("/event-prices/:id", handler.UpdateAEventPrices)
 
 		admin.Post("/restaurants", handler.CreateARestaurant)
 		admin.Post("/menu", handler.CreateAMenu)
-	
+		admin.Post("/event-prices", handler.CreateAEventPrices)
+
 		admin.Delete("/restaurants/:id", handler.DeleteARestaurants)
+		admin.Delete("/menu/:id", handler.DeleteAMenu)
+		admin.Delete("/event-prices/:id", handler.DeleteAEventPrices)
 	}
 
 	app.Get("/v1/restaurants/:id?", handler.GetRestaurants)

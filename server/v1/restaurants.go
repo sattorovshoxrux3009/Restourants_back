@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
@@ -14,21 +16,31 @@ import (
 	"github.com/sattorovshoxrux3009/Restourants_back/storage/repo"
 )
 
-func saveImage(ctx *fiber.Ctx, file *multipart.FileHeader) (string, error) {
-	fileExtension := filepath.Ext(file.Filename)
+func saveImage(c *fiber.Ctx, file *multipart.FileHeader) (string, error) {
+	const maxFileSize = 5 * 1024 * 1024 // 10MB
+	var allowedExtensions = map[string]bool{
+		".jpg":  true,
+		".jpeg": true,
+		".png":  true,
+		".webp": true,
+	}
+	if file.Size > maxFileSize {
+		return "", fmt.Errorf("file size too large, maximum allowed size is 5MB")
+	}
+	fileExtension := strings.ToLower(filepath.Ext(file.Filename))
+	if !allowedExtensions[fileExtension] {
+		return "", fmt.Errorf("invalid file type, only JPG, JPEG, PNG, and WEBP are allowed")
+	}
 	newFileName := fmt.Sprintf("%s%s", uuid.New().String(), fileExtension)
 	dst := filepath.Join("uploads", "restaurants", newFileName)
-
-	if err := os.MkdirAll(filepath.Dir(dst), os.ModePerm); err != nil {
+	err := os.MkdirAll(filepath.Dir(dst), os.ModePerm)
+	if err != nil {
 		return "", err
 	}
-
-	if err := ctx.SaveFile(file, dst); err != nil {
+	if err := c.SaveFile(file, dst); err != nil {
 		return "", err
 	}
-
-	imageURL := "/uploads/restaurants/" + newFileName
-	return imageURL, nil
+	return "/uploads/restaurants/" + newFileName, nil
 }
 
 // Create Restaurants
@@ -413,9 +425,14 @@ func (h *handlerV1) UpdateSRestaurant(c *fiber.Ctx) error {
 		// Eski rasmni o‘chirish
 		if restaurant.ImageURL != "" {
 			oldImagePath := filepath.Join("uploads", "restaurants", filepath.Base(restaurant.ImageURL))
-			_ = os.Remove(oldImagePath)
+			go func() {
+				time.Sleep(2 * time.Second)
+				err := os.Remove(oldImagePath)
+				if err != nil {
+					log.Fatal("Faylni o‘chirishda xatolik:", err)
+				}
+			}()
 		}
-
 		// Yangi rasmni saqlash
 		imageURL, err := saveImage(c, file)
 		if err != nil {
@@ -524,9 +541,18 @@ func (h *handlerV1) UpdateARestauranats(c *fiber.Ctx) error {
 		// Eski rasmni o‘chirish
 		if restaurant.ImageURL != "" {
 			oldImagePath := filepath.Join("uploads", "restaurants", filepath.Base(restaurant.ImageURL))
-			_ = os.Remove(oldImagePath)
+			f, err := os.Open(oldImagePath)
+			if err == nil {
+				f.Close() // Majburiy yopish!
+			}
+			go func() {
+				time.Sleep(2 * time.Second)
+				err := os.Remove(oldImagePath)
+				if err != nil {
+					log.Fatal("Faylni o‘chirishda xatolik:", err)
+				}
+			}()
 		}
-
 		// Yangi rasmni saqlash
 		imageURL, err := saveImage(c, file)
 		if err != nil {

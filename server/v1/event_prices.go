@@ -9,6 +9,7 @@ import (
 	"github.com/sattorovshoxrux3009/Restourants_back/storage/repo"
 )
 
+// Create
 func (h *handlerV1) CreateSEventPrices(c *fiber.Ctx) error {
 	var req models.EventPrice
 	if err := c.BodyParser(&req); err != nil {
@@ -48,6 +49,69 @@ func (h *handlerV1) CreateSEventPrices(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{"event_price": EventPrice})
 }
 
+func (h *handlerV1) CreateAEventPrices(c *fiber.Ctx) error {
+	adminID := c.Locals("admin_id")
+	uintID, ok := adminID.(uint)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Unauthorized"})
+	}
+	intID := int(uintID)
+
+	var req models.EventPrice
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+	}
+	if req.EventType != "morning" && req.EventType != "night" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid event type"})
+	}
+	restaurant, err := h.strg.Restaurants().GetById(c.Context(), req.RestaurantId)
+	if err != nil || restaurant == nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Restaurant does not exist"})
+	}
+
+	adminRestaurants, err := h.strg.Restaurants().GetByOwnerId(c.Context(), intID, "", 20)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Internal server error"})
+	}
+	var access bool
+	for _, r := range adminRestaurants {
+		if r.Id == uint(req.RestaurantId) {
+			access = true
+			break
+		}
+	}
+	if !access {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Access denied"})
+	}
+
+	existingEvents, err := h.strg.EventPrices().GetByRestaurantID(c.Context(), req.RestaurantId)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Internal server error"})
+	}
+	for _, event := range existingEvents {
+		if event.EventType == req.EventType {
+			return c.Status(fiber.StatusConflict).JSON(fiber.Map{
+				"error": fmt.Sprintf("Event type '%s' already exists for this restaurant", req.EventType),
+			})
+		}
+	}
+	EventPrice, err := h.strg.EventPrices().Create(c.Context(), &repo.EventPrice{
+		RestaurantId:      uint(req.RestaurantId),
+		EventType:         req.EventType,
+		TablePrice:        req.TablePrice,
+		WaiterPrice:       req.WaiterPrice,
+		MaxGuests:         req.MaxGuests,
+		TableSeats:        req.TableSeats,
+		MaxWaiters:        req.MaxWaiters,
+		AlcoholPermission: req.AlcoholPermission,
+	})
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Internal server error"})
+	}
+	return c.Status(fiber.StatusCreated).JSON(fiber.Map{"event_price": EventPrice})
+}
+
+// Get
 func (h *handlerV1) GetSEventPrices(c *fiber.Ctx) error {
 	eventId := c.Params("id")
 	if eventId != "" {
@@ -84,6 +148,91 @@ func (h *handlerV1) GetSEventPrices(c *fiber.Ctx) error {
 	})
 }
 
+func (h *handlerV1) GetAEventPrices(c *fiber.Ctx) error {
+	// 1️⃣ Admin ID ni olish
+	adminID := c.Locals("admin_id")
+	uintID, ok := adminID.(uint)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Unauthorized"})
+	}
+	intID := int(uintID)
+
+	// 2️⃣ ID orqali bitta eventni olish
+	eventId := c.Params("id")
+	if eventId != "" {
+		id, err := strconv.Atoi(eventId)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid event ID"})
+		}
+
+		event, err := h.strg.EventPrices().GetByID(c.Context(), id)
+		if err != nil || event == nil {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Event not found"})
+		}
+
+		// 3️⃣ Adminning restoranlarini olish
+		restaurants, err := h.strg.Restaurants().GetByOwnerId(c.Context(), intID, "", 20)
+		if err != nil || len(restaurants) == 0 {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Restaurant not found"})
+		}
+
+		// 4️⃣ Admin ushbu eventga egalik qiladimi?
+		var access = false
+		for _, r := range restaurants {
+			if r.Id == event.RestaurantId {
+				access = true
+				break
+			}
+		}
+
+		if !access {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Access denied"})
+		}
+
+		// ✅ Eventni qaytarish
+		return c.Status(fiber.StatusOK).JSON(event)
+	}
+
+	// 5️⃣ Adminning barcha restoranlarini olish
+	restaurants, err := h.strg.Restaurants().GetByOwnerId(c.Context(), intID, "", 50) // 50ta limit
+	if err != nil || len(restaurants) == 0 {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "No restaurants found"})
+	}
+
+	// 6️⃣ Adminning restoranlari ro‘yxatini mapga o‘giramiz (tejalgan qidiruv uchun)
+	restaurantMap := make(map[int]bool)
+	for _, r := range restaurants {
+		restaurantMap[int(r.Id)] = true
+	}
+
+	// 7️⃣ Query orqali kelgan ma’lumotlarni olish
+	page, _ := strconv.Atoi(c.Query("page", "1"))
+	limit, _ := strconv.Atoi(c.Query("limit", "20"))
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 {
+		limit = 20
+	}
+
+	eventType := c.Query("eventtype")
+
+	// 9️⃣ Faqat admin egalik qiladigan restoranlarning eventlarini olish
+	events, currentPage, totalPages, err := h.strg.EventPrices().GetAllByRestaurantIDs(c.Context(), restaurantMap, eventType, page, limit)
+	if err != nil {
+		fmt.Println(err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to get events"})
+	}
+
+	// ✅ Eventlarni qaytarish
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"events":       events,
+		"current_page": currentPage,
+		"total_page":   totalPages,
+	})
+}
+
+// Update
 func (h *handlerV1) UpdateSEventPrices(c *fiber.Ctx) error {
 	id, err := strconv.Atoi(c.Params("id"))
 	if err != nil {
@@ -117,6 +266,61 @@ func (h *handlerV1) UpdateSEventPrices(c *fiber.Ctx) error {
 	})
 }
 
+func (h *handlerV1) UpdateAEventPrices(c *fiber.Ctx) error {
+	adminID := c.Locals("admin_id")
+	uintID, ok := adminID.(uint)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Unauthorized"})
+	}
+	intID := int(uintID)
+
+	id, err := strconv.Atoi(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid ID format"})
+	}
+
+	var req models.UpdateEventPrices
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	existingEvent, err := h.strg.EventPrices().GetByID(c.Context(), id)
+	if err != nil || existingEvent == nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Event price not found"})
+	}
+
+	adminRestaurants, err := h.strg.Restaurants().GetByOwnerId(c.Context(), intID, "", 20)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Internal server error"})
+	}
+	var access bool
+	for _, r := range adminRestaurants {
+		if r.Id == uint(existingEvent.RestaurantId) {
+			access = true
+			break
+		}
+	}
+	if !access {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Access denied"})
+	}
+
+	existingEvent.TablePrice = req.TablePrice
+	existingEvent.WaiterPrice = req.WaiterPrice
+	existingEvent.MaxGuests = req.MaxGuests
+	existingEvent.TableSeats = req.TableSeats
+	existingEvent.MaxWaiters = req.MaxWaiters
+	existingEvent.AlcoholPermission = req.AlcoholPermission
+
+	if err := h.strg.EventPrices().Update(c.Context(), existingEvent); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to update event price"})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "Event price updated successfully",
+	})
+}
+
+// Delete
 func (h *handlerV1) DeleteSEventPrices(c *fiber.Ctx) error {
 	id, err := strconv.Atoi(c.Params("id"))
 	if err != nil {
@@ -126,6 +330,46 @@ func (h *handlerV1) DeleteSEventPrices(c *fiber.Ctx) error {
 	existingEvent, err := h.strg.EventPrices().GetByID(c.Context(), id)
 	if err != nil || existingEvent == nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Event price not found"})
+	}
+
+	if err := h.strg.EventPrices().Delete(c.Context(), id); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to delete event price"})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{"message": "Event price deleted successfully"})
+}
+
+func (h *handlerV1) DeleteAEventPrices(c *fiber.Ctx) error {
+	adminID := c.Locals("admin_id")
+	uintID, ok := adminID.(uint)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Unauthorized"})
+	}
+	intID := int(uintID)
+
+	id, err := strconv.Atoi(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid ID format"})
+	}
+
+	existingEvent, err := h.strg.EventPrices().GetByID(c.Context(), id)
+	if err != nil || existingEvent == nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Event price not found"})
+	}
+
+	adminRestaurants, err := h.strg.Restaurants().GetByOwnerId(c.Context(), intID, "", 20)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Internal server error"})
+	}
+	var access bool
+	for _, r := range adminRestaurants {
+		if r.Id == uint(existingEvent.RestaurantId) {
+			access = true
+			break
+		}
+	}
+	if !access {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Access denied"})
 	}
 
 	if err := h.strg.EventPrices().Delete(c.Context(), id); err != nil {

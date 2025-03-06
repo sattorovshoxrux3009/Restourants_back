@@ -150,28 +150,49 @@ func (r *restaurantsRepo) GetById(ctx context.Context, id int) (*repo.Restaurant
 	var restaurant repo.Restaurant
 	result := r.db.WithContext(ctx).First(&restaurant, id)
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-		return nil, nil
+		return nil, errors.New("restaurant not found")
 	}
-	return &restaurant, result.Error
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	return &restaurant, nil
 }
 
 func (r *restaurantsRepo) Update(ctx context.Context, id int, req *repo.UpdateRestaurant) error {
 	result := r.db.WithContext(ctx).Model(&repo.Restaurant{}).Where("id = ?", id).Updates(req)
-	return result.Error
+
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return errors.New("restaurant not found")
+	}
+
+	return nil
 }
 
 func (r *restaurantsRepo) UpdateStatus(ctx context.Context, id int, status string) error {
 	result := r.db.WithContext(ctx).Model(&repo.Restaurant{}).Where("id = ?", id).Update("status", status)
+
 	if result.Error != nil {
 		return result.Error
 	}
+	if result.RowsAffected == 0 {
+		return errors.New("restaurant not found")
+	}
+
 	return nil
 }
 
 func (r *restaurantsRepo) Delete(ctx context.Context, id int) error {
 	result := r.db.WithContext(ctx).Where("id = ?", id).Delete(&repo.Restaurant{})
+
 	if result.Error != nil {
 		return result.Error
 	}
+	if result.RowsAffected == 0 {
+		return errors.New("restaurant not found")
+	}
+
 	return nil
 }
