@@ -15,14 +15,18 @@ type Options struct {
 }
 
 func NewServer(opts *Options) *fiber.App {
-	app := fiber.New()
-
-	// IP log middleware
-	// app.Use(func(c *fiber.Ctx) error {
-	// 	clientIP := c.IP()
-	// 	println("Yangi so‘rov! IP:", clientIP)
-	// 	return c.Next()
+	// app := fiber.New(fiber.Config{
+	// 	// HTTPS uchun TLS konfiguratsiyasi
+	// 	DisableKeepalive: false,
 	// })
+	app := fiber.New()
+	// IP log middleware
+	app.Use(func(c *fiber.Ctx) error {
+		clientIP := c.IP()
+		requestTime := time.Now().Format("2006-01-02 15:04:05") // Yil-oy-kun soat:minut:sekund
+		println("Yangi so‘rov! IP:", clientIP, "Vaqt:", requestTime)
+		return c.Next()
+	})
 
 	// var blockedIPs = map[string]bool{
 	// 	"172.25.25.101": true, // Bloklangan IP
@@ -44,10 +48,11 @@ func NewServer(opts *Options) *fiber.App {
 
 	// CORS middleware
 	app.Use(cors.New(cors.Config{
-		AllowOrigins:     "http://localhost:5173",
-		AllowMethods:     "GET,POST,PUT,DELETE,OPTIONS",
+		AllowOrigins:     "*",
+		AllowMethods:     "GET,POST,PUT,DELETE",
 		AllowHeaders:     "Origin, Content-Type, Authorization",
-		AllowCredentials: true,
+		AllowOriginsFunc: func(origin string) bool { return true }, // OPTIONS muammosini hal qiladi
+		// AllowCredentials: true,
 	}))
 
 	app.Use(limiter.New(limiter.Config{
@@ -67,7 +72,9 @@ func NewServer(opts *Options) *fiber.App {
 	handler := v1.New(&v1.HandlerV1{
 		Strg: opts.Strg,
 	})
-
+	app.Options("/*", func(c *fiber.Ctx) error {
+		return c.SendStatus(204) // No Content
+	})
 	// Statik fayllar uchun
 	app.Static("/uploads", "./uploads")
 

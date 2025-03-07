@@ -158,7 +158,8 @@ func (r *restaurantsRepo) GetById(ctx context.Context, id int) (*repo.Restaurant
 	return &restaurant, nil
 }
 
-func (r *restaurantsRepo) Update(ctx context.Context, id int, req *repo.UpdateRestaurant) error {
+func (r *restaurantsRepo) Update(ctx context.Context, id int, req *repo.Restaurant) error {
+
 	result := r.db.WithContext(ctx).Model(&repo.Restaurant{}).Where("id = ?", id).Updates(req)
 
 	if result.Error != nil {

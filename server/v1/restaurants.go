@@ -406,7 +406,7 @@ func (h *handlerV1) UpdateSRestaurant(c *fiber.Ctx) error {
 	}
 
 	// Form-data dan ma'lumotlarni olish
-	var req models.UpdateRestaurants
+	var req models.Restourants
 	req.Name = c.FormValue("name")
 	req.Address = c.FormValue("address")
 	req.Latitude, _ = strconv.ParseFloat(c.FormValue("latitude"), 64)
@@ -414,7 +414,7 @@ func (h *handlerV1) UpdateSRestaurant(c *fiber.Ctx) error {
 	req.PhoneNumber = c.FormValue("phone_number")
 	req.Email = c.FormValue("email")
 	req.Capacity, _ = strconv.Atoi(c.FormValue("capacity"))
-	req.OwnerID, _ = strconv.Atoi(c.FormValue("owner_id"))
+	req.OwnerId, _ = strconv.Atoi(c.FormValue("owner_id"))
 	req.OpeningHours = c.FormValue("opening_hours")
 	req.Description = c.FormValue("description")
 	req.AlcoholPermission, _ = strconv.ParseBool(c.FormValue("alcohol_permission"))
@@ -443,7 +443,7 @@ func (h *handlerV1) UpdateSRestaurant(c *fiber.Ctx) error {
 		req.ImageURL = restaurant.ImageURL // Agar yangi rasm kelmasa, eski rasmni saqlaymiz
 	}
 
-	err = h.strg.Restaurants().Update(c.Context(), id, &repo.UpdateRestaurant{
+	err = h.strg.Restaurants().Update(c.Context(), id, &repo.Restaurant{
 		Name:              req.Name,
 		Address:           req.Address,
 		Latitude:          req.Latitude,
@@ -451,7 +451,7 @@ func (h *handlerV1) UpdateSRestaurant(c *fiber.Ctx) error {
 		PhoneNumber:       req.PhoneNumber,
 		Email:             req.Email,
 		Capacity:          req.Capacity,
-		OwnerID:           req.OwnerID,
+		OwnerId:           uint(req.OwnerId),
 		OpeningHours:      req.OpeningHours,
 		ImageURL:          req.ImageURL,
 		Description:       req.Description,
@@ -523,7 +523,7 @@ func (h *handlerV1) UpdateARestauranats(c *fiber.Ctx) error {
 	}
 
 	// Form-data dan ma'lumotlarni olish
-	var req models.UpdateRestaurants
+	var req models.Restourants
 	req.Name = c.FormValue("name")
 	req.Address = c.FormValue("address")
 	req.Latitude, _ = strconv.ParseFloat(c.FormValue("latitude"), 64)
@@ -563,7 +563,7 @@ func (h *handlerV1) UpdateARestauranats(c *fiber.Ctx) error {
 		req.ImageURL = restaurant.ImageURL // Agar yangi rasm kelmasa, eski rasmni saqlaymiz
 	}
 
-	err = h.strg.Restaurants().Update(c.Context(), id, &repo.UpdateRestaurant{
+	err = h.strg.Restaurants().Update(c.Context(), id, &repo.Restaurant{
 		Name:              req.Name,
 		Address:           req.Address,
 		Latitude:          req.Latitude,

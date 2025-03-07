@@ -10,8 +10,8 @@ import (
 	"github.com/sattorovshoxrux3009/Restourants_back/storage/repo" // Modellarni chaqiramiz
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
-	"gorm.io/gorm/schema"
 	"gorm.io/gorm/logger"
+	"gorm.io/gorm/schema"
 )
 
 func main() {
@@ -61,8 +61,12 @@ func main() {
 	router := server.NewServer(&server.Options{
 		Strg: strg,
 	})
-
-	if err := router.Listen("127.0.0.1" + cfg.Port); err != nil {
+	
+	if err := router.Listen(cfg.Port); err != nil {
 		log.Fatal("Error starting server: ", err)
 	}
+
+	// if err := router.ListenTLS(cfg.Port, "cert.pem", "key.pem"); err != nil {
+	// 	log.Fatal("Error starting server: ", err)
+	// }
 }

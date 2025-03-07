@@ -11,7 +11,7 @@ type RestaurantsI interface {
 	GetSall(ctx context.Context, status, phonenumber, email, ownerid, name, address, capacity, alcohol_permission string, page, limit int) ([]Restaurant, int, int, error)
 	GetByOwnerId(ctx context.Context, ownerID int, name string, limit int) ([]Restaurant, error)
 	GetById(ctx context.Context, id int) (*Restaurant, error)
-	Update(ctx context.Context, id int, req *UpdateRestaurant) error
+	Update(ctx context.Context, id int, req *Restaurant) error
 	UpdateStatus(ctx context.Context, id int, status string) error
 	Delete(ctx context.Context, id int) error
 }
