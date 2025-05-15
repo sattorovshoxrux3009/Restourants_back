@@ -160,3 +160,44 @@ func (m *menuRepo) Delete(ctx context.Context, id int) error {
 
 	return nil
 }
+
+func (r *menuRepo) SearchByName(ctx context.Context, nameQuery string, page int, limit int) ([]repo.MenuShort, int, error) {
+	var results []repo.MenuShort
+	if limit <= 0 {
+		limit = 10
+	}
+	if page <= 0 {
+		page = 1
+	}
+	offset := (page - 1) * limit
+
+	likePattern := nameQuery + "%"
+
+	// 1. Jami yozuvlar sonini hisoblash
+	var totalCount int64
+	err := r.db.WithContext(ctx).
+		Table("menu").
+		Joins("JOIN restaurant ON menu.restaurant_id = restaurant.id").
+		Where("menu.name LIKE ?", likePattern).
+		Count(&totalCount).Error
+	if err != nil {
+		return nil, 0, err
+	}
+
+	// 2. Menularni olish
+	err = r.db.WithContext(ctx).
+		Table("menu").
+		Select(`menu.name, menu.image_url, menu.price, menu.restaurant_id, restaurant.name AS restaurant_name, ? AS type`, "menu").
+		Joins("JOIN restaurant ON menu.restaurant_id = restaurant.id").
+		Where("menu.name LIKE ?", likePattern).
+		Limit(limit).
+		Offset(offset).
+		Scan(&results).Error
+	if err != nil {
+		return nil, 0, err
+	}
+
+	totalPages := int((totalCount + int64(limit) - 1) / int64(limit))
+
+	return results, totalPages, nil
+}

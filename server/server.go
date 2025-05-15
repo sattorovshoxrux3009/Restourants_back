@@ -131,81 +131,8 @@ func NewServer(opts *Options) *fiber.App {
 
 	app.Get("/v1/restaurants/:id?", handler.GetRestaurants)
 	app.Get("/v1/menu/:id?", handler.GetMenu)
+	app.Get("/v1/restaurants/:id/details", handler.GetRestaurantDetails)
+	app.Get("/v1/search", handler.GetSearch)
 
 	return app
 }
-
-// package server
-
-// import (
-// 	"github.com/gin-contrib/cors"
-// 	"github.com/gin-gonic/gin"
-// 	v1 "github.com/sattorovshoxrux3009/Restourants_back/server/v1"
-// 	"github.com/sattorovshoxrux3009/Restourants_back/storage"
-// )
-
-// type Options struct {
-// 	Strg storage.StorageI
-// }
-
-// func NewServer(opts *Options) *gin.Engine {
-// 	router := gin.New()
-// 	router.Use(cors.New(cors.Config{
-// 		AllowOrigins:     []string{"http://localhost:5173"},
-// 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-// 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
-// 		AllowCredentials: true,
-// 	}))
-// 	handler := v1.New(&v1.HandlerV1{
-// 		Strg: opts.Strg,
-// 	})
-// 	router.Static("/uploads", "./uploads")
-
-// 	router.POST("/v1/create-s-admin", handler.CreateSuperAdmin)
-// 	router.POST("/v1/login", handler.Login)
-
-// 	router.GET("/v1/restaurants", handler.GetRestourants)
-// 	router.GET("/v1/restaurants/:id", handler.GetRestourants)
-// 	router.GET("/v1/menu", handler.GetMenu)
-// 	router.GET("/v1/menu/:id", handler.GetMenu)
-
-// 	superAdmin := router.Group("/v1")
-// 	superAdmin.Use(handler.AuthMiddleware(), handler.SuperAdminMiddleware())
-// 	{
-// 		superAdmin.GET("/admins", handler.GetAdmins)
-// 		superAdmin.GET("/admins/:id", handler.GetAdmins)
-// 		superAdmin.GET("/admins/:id/details", handler.GetAdminDetails)
-// 		superAdmin.GET("/s-restaurants", handler.GetSRestourants)
-// 		superAdmin.GET("/s-restaurants/:id", handler.GetSRestourants)
-// 		superAdmin.GET("/s-restaurants/:id/details", handler.GetSRestaurantDetails)
-// 		superAdmin.GET("/s-menu", handler.GetSMenu)
-// 		superAdmin.GET("/s-menu/:id", handler.GetSMenu)
-// 		superAdmin.GET("/s-profile", handler.GetSProfile)
-// 		superAdmin.GET("/s-event-prices", handler.GetSEventPrices)
-// 		superAdmin.GET("/s-event-prices/:id", handler.GetSEventPrices)
-
-// 		superAdmin.POST("/create-admin", handler.CreateAdmin)
-// 		superAdmin.POST("/create-restaurant", handler.CreateRestaurant)
-// 		superAdmin.POST("/s-menu", handler.CreateSMenu)
-// 		superAdmin.POST("/s-event-prices", handler.CreateSEventPrices)
-
-// 		superAdmin.PUT("/update-admin/:id", handler.UpdateAdmin)
-// 		superAdmin.PUT("/restaurants/:id/status", handler.UpdateRestaurantStatus)
-// 		superAdmin.PUT("/restaurants/:id", handler.UpdateRestaurant)
-// 		superAdmin.PUT("/s-menu/:id", handler.UpdateSMenu)
-// 		superAdmin.PUT("/s-profile", handler.UpdateSProfile)
-// 		superAdmin.PUT("/s-event-prices/:id", handler.UpdateSEventPrices)
-
-// 		superAdmin.DELETE("/admin/:id", handler.DeleteAdmin)
-// 		superAdmin.DELETE("/s-restaurants/:id", handler.DeleteRastaurant)
-// 		superAdmin.DELETE("/s-menu/:id", handler.DeleteSMenu)
-// 		superAdmin.DELETE("/s-event-prices/:id", handler.DeleteSEventPrices)
-// 	}
-
-// 	admin := router.Group("/v1")
-// 	admin.Use(handler.AuthMiddleware(), handler.AdminMiddleware())
-// 	{
-// 		admin.GET("/profile", handler.GetProfile)
-// 	}
-// 	return router
-// }

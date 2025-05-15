@@ -6,6 +6,7 @@ import (
 	"mime/multipart"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -293,6 +294,37 @@ func (h *handlerV1) GetSRestaurantDetails(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"restaurant":      restaurant,
 		"restaurant_menu": restaurantMenu,
+	})
+}
+
+func (h *handlerV1) GetRestaurantDetails(c *fiber.Ctx) error {
+	restaurantID := c.Params("id")
+	id, err := strconv.Atoi(restaurantID)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid restaurant ID"})
+	}
+
+	restaurant, err := h.strg.Restaurants().GetById(c.Context(), id)
+
+	if err != nil || restaurant.Status != "active" {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Restaurant not found"})
+	}
+	restaurant.OwnerId = 0
+	restaurant.CreatedAt = time.Time{}
+
+	restaurantMenu, err := h.strg.Menu().GetByRestaurantId(c.Context(), id)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to get restaurant menu"})
+	}
+
+	restaurantPrice, err := h.strg.EventPrices().GetByRestaurantID(c.Context(), id)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to get restaurant menu"})
+	}
+	return c.JSON(fiber.Map{
+		"restaurant":        restaurant,
+		"restaurant_menu":   restaurantMenu,
+		"restaurant_prices": restaurantPrice,
 	})
 }
 
@@ -642,6 +674,49 @@ func (h *handlerV1) DeleteARestaurants(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Internal server error :("})
 	}
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{"message": "Restaurant delete successfuly"})
+}
+
+func (h *handlerV1) GetSearch(c *fiber.Ctx) error {
+	query := c.Query("query")
+	if query == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Query is null"})
+	}
+	isAlpha := regexp.MustCompile(`^[\p{L}'‘’\-\x60]+$`).MatchString
+	if !isAlpha(query) {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Query must contain only letters (Latin or Cyrillic)",
+		})
+	}
+	pageStr := c.Query("page", "1")
+	page, err := strconv.Atoi(pageStr)
+	if err != nil || page < 1 {
+		page = 1
+	}
+
+	limit := 5
+
+	results, restourantTotalPages, err := h.strg.Restaurants().SearchByName(c.Context(), query, page, limit)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to search restaurants",
+		})
+	}
+	menus, menuTotalPages, err := h.strg.Menu().SearchByName(c.Context(), query, page, limit)
+
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to search menus",
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"restaurants":          results,
+		"menus":                menus,
+		"page":                 page,
+		"limit":                limit,
+		"restourantTotalPages": restourantTotalPages,
+		"menuTotalPages":       menuTotalPages,
+	})
 }
 
 // package v1

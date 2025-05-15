@@ -25,7 +25,7 @@ func main() {
 		cfg.Mysql.Port,     // Port (masalan, "3306")
 		cfg.Mysql.Database, // Ma'lumotlar bazasi nomi
 	)
-
+	fmt.Println(mysqlUrl)
 	// GORM bilan ulanish
 	mysqlConn, err := gorm.Open(mysql.Open(mysqlUrl), &gorm.Config{
 		NamingStrategy: schema.NamingStrategy{

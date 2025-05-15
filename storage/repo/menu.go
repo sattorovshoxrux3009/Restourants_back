@@ -14,6 +14,7 @@ type MenuI interface {
 	GetByRestaurantId(ctx context.Context, id int) ([]*Menu, error)
 	Update(ctx context.Context, id int, req *Menu) (*Menu, error)
 	Delete(ctx context.Context, id int) error
+	SearchByName(ctx context.Context, nameQuery string, page int, limit int) ([]MenuShort, int, error)
 }
 
 type Menu struct {
@@ -28,4 +29,12 @@ type Menu struct {
 	UpdatedAt    time.Time  `gorm:"autoUpdateTime"`
 	Restaurant   Restaurant `json:"-" gorm:"foreignKey:RestaurantId;constraint:OnDelete:CASCADE"`
 	Status       string     `gorm:"column:restaurant_status"` // SQL natijasidagi restaurant_status shu yerga tushadi
+}
+type MenuShort struct {
+	Type           string
+	Name           string
+	ImageUrl       string
+	Price          float64
+	RestaurantName string
+	RestaurantId   uint
 }

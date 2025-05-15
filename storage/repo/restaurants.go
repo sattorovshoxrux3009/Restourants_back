@@ -14,6 +14,7 @@ type RestaurantsI interface {
 	Update(ctx context.Context, id int, req *Restaurant) error
 	UpdateStatus(ctx context.Context, id int, status string) error
 	Delete(ctx context.Context, id int) error
+	SearchByName(ctx context.Context, nameQuery string, page int, limit int) ([]RestaurantShort, int, error)
 }
 
 type CreateRestaurant struct {
@@ -64,4 +65,10 @@ type Restaurant struct {
 	UpdatedAt         time.Time `gorm:"autoUpdateTime"`
 	Status            string    `gorm:"type:enum('active','inactive');default:'active'"`
 	Owner             Admin     `json:"-" gorm:"foreignKey:OwnerId;constraint:OnDelete:CASCADE"`
+}
+type RestaurantShort struct {
+	Id       uint
+	Name     string
+	ImageURL string
+	Type     string
 }

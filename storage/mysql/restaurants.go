@@ -197,3 +197,44 @@ func (r *restaurantsRepo) Delete(ctx context.Context, id int) error {
 
 	return nil
 }
+
+func (r *restaurantsRepo) SearchByName(ctx context.Context, nameQuery string, page int, limit int) ([]repo.RestaurantShort, int, error) {
+	var results []repo.RestaurantShort
+
+	if limit <= 0 {
+		limit = 10 // default limit
+	}
+	if page <= 0 {
+		page = 1
+	}
+	offset := (page - 1) * limit
+
+	likePattern := nameQuery + "%"
+
+	// 1. Jami yozuvlar sonini hisoblash
+	var totalCount int64
+	err := r.db.WithContext(ctx).
+		Table("restaurant").
+		Where("name LIKE ?", likePattern).
+		Count(&totalCount).Error
+	if err != nil {
+		return nil, 0, err
+	}
+
+	// 2. Ma'lumotlarni olish (pagination)
+	err = r.db.WithContext(ctx).
+		Table("restaurant").
+		Select("id, name, image_url, ? AS type", "restaurant").
+		Where("name LIKE ?", likePattern).
+		Limit(limit).
+		Offset(offset).
+		Scan(&results).Error
+	if err != nil {
+		return nil, 0, err
+	}
+
+	// 3. totalPages hisoblash
+	totalPages := int((totalCount + int64(limit) - 1) / int64(limit)) // ceil
+
+	return results, totalPages, nil
+}

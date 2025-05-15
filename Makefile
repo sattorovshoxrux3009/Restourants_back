@@ -14,6 +14,11 @@ run:
 build:
 	@go build -o bin/main.exe cmd/main.go
 
+git:
+	@git add .
+	@git commit -m "Updated"
+	@git push
+
 migration:
 	@migrate create -ext sql -dir ./migrations -seq $(name)
 
