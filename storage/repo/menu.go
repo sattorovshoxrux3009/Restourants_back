@@ -31,6 +31,7 @@ type Menu struct {
 	Status       string     `gorm:"column:restaurant_status"` // SQL natijasidagi restaurant_status shu yerga tushadi
 }
 type MenuShort struct {
+	Id             uint
 	Type           string
 	Name           string
 	ImageUrl       string

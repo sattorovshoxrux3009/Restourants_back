@@ -13,7 +13,10 @@ run:
 
 build:
 	@go build -o bin/main.exe cmd/main.go
-
+	
+build-linux:
+	GOOS=linux GOARCH=amd64 go build -o bin/restaurants cmd/main.go
+	
 git:
 	@git add .
 	@git commit -m "Updated"

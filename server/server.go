@@ -78,7 +78,7 @@ func NewServer(opts *Options) *fiber.App {
 	// Statik fayllar uchun
 	app.Static("/uploads", "./uploads")
 
-	app.Post("/v1/s-admin", handler.CreateSuperAdmin)
+	// app.Post("/v1/s-admin", handler.CreateSuperAdmin)
 	app.Post("/v1/login", handler.Login)
 
 	superAdmin := app.Group("/v1/superadmin", handler.AuthMiddleware(), handler.SuperAdminMiddleware())

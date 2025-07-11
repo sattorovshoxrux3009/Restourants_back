@@ -187,7 +187,7 @@ func (r *menuRepo) SearchByName(ctx context.Context, nameQuery string, page int,
 	// 2. Menularni olish
 	err = r.db.WithContext(ctx).
 		Table("menu").
-		Select(`menu.name, menu.image_url, menu.price, menu.restaurant_id, restaurant.name AS restaurant_name, ? AS type`, "menu").
+		Select(`menu.id, menu.name, menu.image_url, menu.price, menu.restaurant_id, restaurant.name AS restaurant_name, ? AS type`, "menu").
 		Joins("JOIN restaurant ON menu.restaurant_id = restaurant.id").
 		Where("menu.name LIKE ?", likePattern).
 		Limit(limit).
