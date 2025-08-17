@@ -15,7 +15,7 @@ type StorageI interface {
 	Menu() repo.MenuI
 	EventPrices() repo.EventPricesI
 }
-type storagePg struct {
+type StoragePg struct {
 	superAdminRepo            repo.SuperAdminStorageI
 	adminRepo                 repo.AdminStorageI
 	tokenRepo                 repo.TokenStorageI
@@ -26,7 +26,7 @@ type storagePg struct {
 }
 
 func NewStorage(mysqlConn *gorm.DB) StorageI {
-	return &storagePg{
+	return &StoragePg{
 		superAdminRepo:            mysql.NewSuperAdminStorage(mysqlConn),
 		adminRepo:                 mysql.NewAdminStorage(mysqlConn),
 		tokenRepo:                 mysql.NewTokenStorage(mysqlConn),
@@ -36,24 +36,24 @@ func NewStorage(mysqlConn *gorm.DB) StorageI {
 		eventPricesRepo:           mysql.NewEventPricesStorage(mysqlConn),
 	}
 }
-func (s *storagePg) SuperAdmin() repo.SuperAdminStorageI {
+func (s *StoragePg) SuperAdmin() repo.SuperAdminStorageI {
 	return s.superAdminRepo
 }
-func (s *storagePg) Admin() repo.AdminStorageI {
+func (s *StoragePg) Admin() repo.AdminStorageI {
 	return s.adminRepo
 }
-func (s *storagePg) Token() repo.TokenStorageI {
+func (s *StoragePg) Token() repo.TokenStorageI {
 	return s.tokenRepo
 }
-func (s *storagePg) Restaurants() repo.RestaurantsI {
+func (s *StoragePg) Restaurants() repo.RestaurantsI {
 	return s.restaurantsRepo
 }
-func (s *storagePg) AdminRestaurantsLimit() repo.AdminRestaurantsLimitI {
+func (s *StoragePg) AdminRestaurantsLimit() repo.AdminRestaurantsLimitI {
 	return s.adminRestaurantsLimitRepo
 }
-func (s *storagePg) Menu() repo.MenuI {
+func (s *StoragePg) Menu() repo.MenuI {
 	return s.menuRepo
 }
-func (s *storagePg) EventPrices() repo.EventPricesI {
+func (s *StoragePg) EventPrices() repo.EventPricesI {
 	return s.eventPricesRepo
 }

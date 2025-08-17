@@ -1,11 +1,9 @@
 package server
 
 import (
-	"time"
-
 	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/cors"
-	"github.com/gofiber/fiber/v2/middleware/limiter"
+	"github.com/gofiber/swagger"
+	"github.com/sattorovshoxrux3009/Restourants_back/middleware"
 	v1 "github.com/sattorovshoxrux3009/Restourants_back/server/v1"
 	"github.com/sattorovshoxrux3009/Restourants_back/storage"
 )
@@ -15,73 +13,42 @@ type Options struct {
 }
 
 func NewServer(opts *Options) *fiber.App {
-	// app := fiber.New(fiber.Config{
-	// 	// HTTPS uchun TLS konfiguratsiyasi
-	// 	DisableKeepalive: false,
-	// })
 	app := fiber.New()
-	// IP log middleware
-	app.Use(func(c *fiber.Ctx) error {
-		clientIP := c.IP()
-		requestTime := time.Now().Format("2006-01-02 15:04:05") // Yil-oy-kun soat:minut:sekund
-		println("Yangi so‘rov! IP:", clientIP, "Vaqt:", requestTime)
-		return c.Next()
-	})
 
-	// var blockedIPs = map[string]bool{
-	// 	"172.25.25.101": true, // Bloklangan IP
-	// 	"10.10.10.5":    true, // Bloklangan IP
-	// }
+	// Global middlewarelar
+	app.Use(middleware.IPLogger())       // IP logger middleware
+	app.Use(middleware.CorsMiddleware()) // CORS middleware
+	app.Use(middleware.RateLimiter())    // Rate limiter middleware
 
-	// app.Use(func(c *fiber.Ctx) error {
-	// 	clientIP := c.IP()
-
-	// 	if blockedIPs[clientIP] {
-	// 		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
-	// 			"error": "Sizning IP-manzilingiz bloklangan",
-	// 		})
-	// 	}
-
-	// 	println("Yangi so‘rov! IP:", clientIP)
-	// 	return c.Next()
-	// })
-
-	// CORS middleware
-	app.Use(cors.New(cors.Config{
-		AllowOrigins:     "*",
-		AllowMethods:     "GET,POST,PUT,DELETE",
-		AllowHeaders:     "Origin, Content-Type, Authorization",
-		AllowOriginsFunc: func(origin string) bool { return true }, // OPTIONS muammosini hal qiladi
-		// AllowCredentials: true,
-	}))
-
-	app.Use(limiter.New(limiter.Config{
-		Max:        60,              // Maksimal 100 ta so‘rov
-		Expiration: 1 * time.Minute, // 1 daqiqa ichida hisoblash
-		KeyGenerator: func(c *fiber.Ctx) string {
-			return c.IP() // Foydalanuvchi IP manzili bo‘yicha cheklash
-		},
-		LimitReached: func(c *fiber.Ctx) error {
-			return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
-				"error": "So‘rovlar soni cheklangan, keyinroq urinib ko‘ring.",
-			})
-		},
-	}))
+	// Swagger documentation endpoint
+	app.Get("/swagger/*", swagger.HandlerDefault)
 
 	// Handler
 	handler := v1.New(&v1.HandlerV1{
 		Strg: opts.Strg,
 	})
+
+	// Middleware'larni initializatsiya qilish
+	authMiddleware := middleware.AuthMiddleware()
+	adminMiddleware := middleware.NewAdminMiddleware(opts.Strg)
+	superAdminMiddleware := middleware.NewSuperAdminMiddleware(opts.Strg)
+
+	// OPTIONS so'rovlari uchun
 	app.Options("/*", func(c *fiber.Ctx) error {
-		return c.SendStatus(204) // No Content
+		return c.SendStatus(204)
 	})
+
 	// Statik fayllar uchun
 	app.Static("/uploads", "./uploads")
 
-	// app.Post("/v1/s-admin", handler.CreateSuperAdmin)
+	// Public endpoints
 	app.Post("/v1/login", handler.Login)
 
-	superAdmin := app.Group("/v1/superadmin", handler.AuthMiddleware(), handler.SuperAdminMiddleware())
+	// Super Admin routes
+	superAdmin := app.Group("/v1/superadmin",
+		authMiddleware,
+		superAdminMiddleware.SuperAdminAuth(),
+	)
 	{
 		superAdmin.Get("/admins/:id?", handler.GetAdmins)
 		superAdmin.Get("/admins/:id/details", handler.GetAdminDetails)
@@ -108,7 +75,11 @@ func NewServer(opts *Options) *fiber.App {
 		superAdmin.Delete("/menu/:id", handler.DeleteSMenu)
 		superAdmin.Delete("/event-prices/:id", handler.DeleteSEventPrices)
 	}
-	admin := app.Group("/v1/admin", handler.AuthMiddleware(), handler.AdminMiddleware())
+	// Admin routes
+	admin := app.Group("/v1/admin",
+		authMiddleware,
+		adminMiddleware.AdminAuth(),
+	)
 	{
 		admin.Get("/profile", handler.GetProfile)
 		admin.Get("/restaurants/:id?", handler.GetARestaurants)

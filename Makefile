@@ -30,3 +30,6 @@ migrateup:
 
 migratedown:
 	@migrate -path ./migrations -database "$(DB_URL)" -verbose down
+
+swag:
+	@swag init -g cmd/main.go

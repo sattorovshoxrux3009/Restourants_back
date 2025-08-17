@@ -5,14 +5,35 @@ import (
 	"log"
 
 	"github.com/sattorovshoxrux3009/Restourants_back/config"
+	_ "github.com/sattorovshoxrux3009/Restourants_back/docs" // Swagger docs
+	"github.com/sattorovshoxrux3009/Restourants_back/seeds"
 	"github.com/sattorovshoxrux3009/Restourants_back/server"
 	"github.com/sattorovshoxrux3009/Restourants_back/storage"
-	"github.com/sattorovshoxrux3009/Restourants_back/storage/repo" // Modellarni chaqiramiz
+	"github.com/sattorovshoxrux3009/Restourants_back/storage/repo"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 	"gorm.io/gorm/schema"
 )
+
+// @title           Restaurants API
+// @version         1.0
+// @description     This is a Restaurants server.
+// @termsOfService  http://swagger.io/terms/
+
+// @contact.name   API Support
+// @contact.url    http://www.swagger.io/support
+// @contact.email  support@swagger.io
+
+// @license.name  Apache 2.0
+// @license.url   http://www.apache.org/licenses/LICENSE-2.0.html
+
+// @host      localhost:3000
+// @BasePath  /
+
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
 
 func main() {
 	cfg := config.Load(".")
@@ -50,23 +71,23 @@ func main() {
 		&repo.SuperAdmin{},
 		&repo.AdminRestaurantLimit{},
 	)
+
 	if err != nil {
-		log.Fatal("Migrationda xatolik:", err)
+		log.Fatal("Error running migrations: ", err)
 	}
+	log.Println("Migration muvaffaqiyatli yakunlandi!")
 
-	fmt.Println("Migration muvaffaqiyatli yakunlandi!")
-
+	// Storage yaratish
 	strg := storage.NewStorage(mysqlConn)
 
-	router := server.NewServer(&server.Options{
+	// Run database seeds
+	seeder := seeds.NewSeeds(strg)
+	seeder.RunAll()
+
+	// Create and start server
+	app := server.NewServer(&server.Options{
 		Strg: strg,
 	})
-	
-	if err := router.Listen(cfg.Port); err != nil {
-		log.Fatal("Error starting server: ", err)
-	}
 
-	// if err := router.ListenTLS(cfg.Port, "cert.pem", "key.pem"); err != nil {
-	// 	log.Fatal("Error starting server: ", err)
-	// }
+	log.Fatal(app.Listen(":3000"))
 }

@@ -61,6 +61,16 @@ func (h *handlerV1) CreateSuperAdmin(ctx *fiber.Ctx) error {
 	})
 }
 
+// @Summary Login
+// @Description Login for admin or super admin
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param login body models.LoginRequest true "Login credentials"
+// @Success 200 {object} models.LoginResponse
+// @Failure 400 {object} models.ErrorResponse "Invalid request"
+// @Failure 401 {object} models.ErrorResponse "Invalid credentials"
+// @Router /v1/login [post]
 func (h *handlerV1) Login(ctx *fiber.Ctx) error {
 	var req models.LoginAdmin
 	if err := ctx.BodyParser(&req); err != nil {
@@ -105,7 +115,7 @@ func (h *handlerV1) Login(ctx *fiber.Ctx) error {
 
 	if role == "superadmin" {
 		err = h.strg.SuperAdmin().UpdateToken(ctx.Context(), username, token)
-		
+
 	} else {
 		tokens, err := h.strg.Token().GetByAdminId(ctx.Context(), int(adminId))
 		if err != nil {

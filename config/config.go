@@ -5,8 +5,8 @@ import (
 	"github.com/spf13/viper"
 )
 
-type Config struct { // Config turini aniqladik
-	Port  string
+type Config struct {
+	Port  string `mapstructure:"port" default:":3000"`
 	Mysql Mysql
 }
 
@@ -24,7 +24,7 @@ func Load(path string) Config {
 	conf.AutomaticEnv()           // Muhit o'zgaruvchilarini avtomatik yuklash
 
 	cfg := Config{
-		Port: conf.GetString("PORT"), 
+		Port: conf.GetString("PORT"),
 		Mysql: Mysql{
 			Host:     conf.GetString("MYSQL_HOST"),
 			Port:     conf.GetString("MYSQL_PORT"),

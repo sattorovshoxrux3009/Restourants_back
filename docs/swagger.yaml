@@ -1,0 +1,441 @@
+basePath: /
+definitions:
+  models.AdminResponse:
+    properties:
+      created_at:
+        type: string
+      email:
+        type: string
+      first_name:
+        type: string
+      id:
+        type: integer
+      last_name:
+        type: string
+      phone_number:
+        type: string
+      username:
+        type: string
+    type: object
+  models.CreateAdmin:
+    properties:
+      email:
+        type: string
+      first_name:
+        type: string
+      last_name:
+        type: string
+      password:
+        type: string
+      phone_number:
+        type: string
+      username:
+        type: string
+    type: object
+  models.ErrorResponse:
+    description: Error response structure
+    properties:
+      message:
+        example: Bad Request
+        type: string
+    type: object
+  models.LoginRequest:
+    description: Login request structure
+    properties:
+      password:
+        example: password123
+        type: string
+      username:
+        example: admin
+        type: string
+    type: object
+  models.LoginResponse:
+    description: Login response structure
+    properties:
+      token:
+        example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        type: string
+    type: object
+  models.MenuResponse:
+    properties:
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: integer
+      image:
+        type: string
+      name:
+        type: string
+      price:
+        type: number
+      restaurant_id:
+        type: integer
+    type: object
+  models.RestaurantResponse:
+    properties:
+      address:
+        type: string
+      admin_id:
+        type: integer
+      created_at:
+        type: string
+      id:
+        type: integer
+      image:
+        type: string
+      name:
+        type: string
+      phone_number:
+        type: string
+    type: object
+  models.SuccessResponse:
+    description: Success response structure
+    properties:
+      message:
+        example: Success
+        type: string
+      name:
+        example: Admin
+        type: string
+      role:
+        example: Super-admin
+        type: string
+      token:
+        example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        type: string
+    type: object
+host: localhost:3000
+info:
+  contact:
+    email: support@swagger.io
+    name: API Support
+    url: http://www.swagger.io/support
+  description: This is a Restaurants server.
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  termsOfService: http://swagger.io/terms/
+  title: Restaurants API
+  version: "1.0"
+paths:
+  /v1/admin/profile:
+    get:
+      consumes:
+      - application/json
+      description: Get current admin profile
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.AdminResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get Admin Profile
+      tags:
+      - admin-profile
+  /v1/login:
+    post:
+      consumes:
+      - application/json
+      description: Login for admin or super admin
+      parameters:
+      - description: Login credentials
+        in: body
+        name: login
+        required: true
+        schema:
+          $ref: '#/definitions/models.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.LoginResponse'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "401":
+          description: Invalid credentials
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: Login
+      tags:
+      - auth
+  /v1/menu:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Create a new menu item for a restaurant
+      parameters:
+      - description: Restaurant ID
+        in: formData
+        name: restaurantid
+        required: true
+        type: string
+      - description: Menu item name
+        in: formData
+        name: name
+        required: true
+        type: string
+      - description: Menu item price
+        in: formData
+        name: price
+        required: true
+        type: number
+      - description: Menu item description
+        in: formData
+        name: description
+        required: true
+        type: string
+      - description: Menu item image
+        in: formData
+        name: image
+        type: file
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.MenuResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create Menu Item
+      tags:
+      - menu
+  /v1/superadmin/admin:
+    post:
+      consumes:
+      - application/json
+      description: Create a new admin user (Super Admin only)
+      parameters:
+      - description: Admin details
+        in: body
+        name: admin
+        required: true
+        schema:
+          $ref: '#/definitions/models.CreateAdmin'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.AdminResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create Admin
+      tags:
+      - Super-admin
+  /v1/superadmin/admin/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete an admin user (Super Admin only)
+      parameters:
+      - description: Admin ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete Admin
+      tags:
+      - super-admin
+    put:
+      consumes:
+      - application/json
+      description: Update admin details (Super Admin only)
+      parameters:
+      - description: Admin ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Update field (status/limit)
+        in: query
+        name: field
+        type: string
+      - description: Admin update data
+        in: body
+        name: admin
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update Admin
+      tags:
+      - super-admin
+  /v1/superadmin/admins/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Get list of all admins (Super Admin only)
+      parameters:
+      - description: Admin ID (optional)
+        in: path
+        name: id
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.AdminResponse'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get All Admins
+      tags:
+      - super-admin
+  /v1/superadmin/restaurant:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Create a new restaurant (Super Admin access)
+      parameters:
+      - description: Restaurant name
+        in: formData
+        name: name
+        required: true
+        type: string
+      - description: Restaurant address
+        in: formData
+        name: address
+        required: true
+        type: string
+      - description: Restaurant phone number
+        in: formData
+        name: phone_number
+        required: true
+        type: string
+      - description: Restaurant image
+        in: formData
+        name: image
+        type: file
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.RestaurantResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create Restaurant (Super Admin)
+      tags:
+      - super-admin-restaurants
+securityDefinitions:
+  BearerAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

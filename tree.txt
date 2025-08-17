@@ -1,0 +1,92 @@
+��������� ����� ���� Windows
+�������� ����� ����: C2A9-6FA9
+C:.
+|   .env
+|   .gitignore
+|   go.mod
+|   go.sum
+|   Makefile
+|   README.md
+|   
++---bin
+|   |   main.exe
+|                  
++---cmd
+|       main.go
+|       
++---config
+|       config.go
+|       
++---docs
+|       docs.go
+|       swagger.json
+|       swagger.yaml
+|       
++---middleware
+|       admin.go
+|       auth.go
+|       config.go
+|       cors.go
+|       ip_logger.go
+|       rate_limiter.go
+|       super_admin.go
+|       
++---migrations
+|       000001_restaurants.down.sql
+|       000001_restaurants.up.sql
+|       
++---seeds
+|       super_admin.go
+|       
++---server
+|   |   server.go
+|   |   
+|   +---models
+|   |       admin.go
+|   |       auth.go
+|   |       detail.go
+|   |       event_prices.go
+|   |       menu.go
+|   |       response.go
+|   |       restaurants.go
+|   |       super_admin.go
+|   |       
+|   \---v1
+|           admin.go
+|           event_prices.go
+|           handler.go
+|           menu.go
+|           restaurants.go
+|           super_admin.go
+|           
++---storage
+|   |   storage.go
+|   |   
+|   +---mysql
+|   |       admin.go
+|   |       admin_restaurants_limit.go
+|   |       event_prices.go
+|   |       menu.go
+|   |       restaurants.go
+|   |       super_admin.go
+|   |       tokens.go
+|   |       
+|   \---repo
+|           admin.go
+|           admin_restaurants_limit.go
+|           event_prices.go
+|           menu.go
+|           restaurants.go
+|           super_admin.go
+|           tokens.go
+|           
++---uploads
+|   +---menu
+|   |       3818d350-d8a2-42e5-8f29-3c791fbcc651.jpg
+|   |       3d4dc31b-2762-4659-8ab8-1835079c0b1c.jpg
+|   |       
+|   \---restaurants
+|           3f4fe3d0-656f-4e00-bbd0-47152a6ef8e3.jpg
+|           53a93e30-fb51-464d-80df-cbcbbfee3dae.jpg
+|           
+\---vendor

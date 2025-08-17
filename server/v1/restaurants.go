@@ -44,7 +44,21 @@ func saveImage(c *fiber.Ctx, file *multipart.FileHeader) (string, error) {
 	return "/uploads/restaurants/" + newFileName, nil
 }
 
-// Create Restaurants
+// @Summary Create Restaurant (Super Admin)
+// @Description Create a new restaurant (Super Admin access)
+// @Tags super-admin-restaurants
+// @Accept multipart/form-data
+// @Produce json
+// @Security BearerAuth
+// @Param name formData string true "Restaurant name"
+// @Param address formData string true "Restaurant address"
+// @Param phone_number formData string true "Restaurant phone number"
+// @Param image formData file false "Restaurant image"
+// @Success 201 {object} models.RestaurantResponse
+// @Failure 400 {object} models.ErrorResponse
+// @Failure 401 {object} models.ErrorResponse
+// @Failure 403 {object} models.ErrorResponse
+// @Router /v1/superadmin/restaurant [post]
 func (h *handlerV1) CreateSRestaurant(c *fiber.Ctx) error {
 	var req models.Restourants
 

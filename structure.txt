@@ -1,0 +1,107 @@
+��������� ����� ���� Windows
+�������� ����� ����: C2A9-6FA9
+C:.
+|   .env
+|   .gitignore
+|   cert.pem
+|   go.mod
+|   go.sum
+|   key.pem
+|   Makefile
+|   README.md
+|   structure.txt
+|   
++---bin
+|   |   .env
+|   |   main.exe
+|   |   restaurants
+|   |   
+|   \---uploads
+|       +---menu
+|       |       3818d350-d8a2-42e5-8f29-3c791fbcc651.jpg
+|       |       3d4dc31b-2762-4659-8ab8-1835079c0b1c.jpg
+|       |       3e404228-cae2-41b4-9756-ff46d03047d1.png
+|       |       68c82f34-e322-4d9b-8813-71c020ddd8da.jpg
+|       |       82d8cd9d-e097-4dd1-a89d-eec332fe9b34.jpg
+|       |       8f131ae4-3296-46f8-83cf-b890d3fa8dcb.png
+|       |       ab9c10a4-a928-43cb-8aa3-35fb234efcb4.png
+|       |       d4c8d93f-6068-4e86-8fbc-96d94f51abdb.jpg
+|       |       e01f2838-0fd0-4ff8-8d67-f023a867a56a.png
+|       |       
+|       \---restaurants
+|               0237f22a-4c49-4f3b-bcca-1ccd45e22659.jpg
+|               06cf7d82-f6a5-4f24-bf31-a19b974ceb83.jpg
+|               3f4fe3d0-656f-4e00-bbd0-47152a6ef8e3.jpg
+|               53a93e30-fb51-464d-80df-cbcbbfee3dae.jpg
+|               863f5663-e505-46c1-92d5-2c47a94b1090.jpg
+|               fe787658-b4c8-4d58-99c0-b019e9ad0ea6.jpg
+|               
++---cmd
+|       main.go
+|       
++---config
+|       config.go
+|       
++---migrations
+|       000001_restaurants.down.sql
+|       000001_restaurants.up.sql
+|       
++---server
+|   |   server.go
+|   |   
+|   +---models
+|   |       admin.go
+|   |       event_prices.go
+|   |       menu.go
+|   |       restaurants.go
+|   |       super_admin.go
+|   |       
+|   \---v1
+|           admin.go
+|           event_prices.go
+|           handler.go
+|           menu.go
+|           middleware.go
+|           restaurants.go
+|           super_admin.go
+|           
++---storage
+|   |   storage.go
+|   |   
+|   +---mysql
+|   |       admin.go
+|   |       admin_restaurants_limit.go
+|   |       event_prices.go
+|   |       menu.go
+|   |       restaurants.go
+|   |       super_admin.go
+|   |       tokens.go
+|   |       
+|   \---repo
+|           admin.go
+|           admin_restaurants_limit.go
+|           event_prices.go
+|           menu.go
+|           restaurants.go
+|           super_admin.go
+|           tokens.go
+|           
++---uploads
+|   +---menu
+|   |       3818d350-d8a2-42e5-8f29-3c791fbcc651.jpg
+|   |       3d4dc31b-2762-4659-8ab8-1835079c0b1c.jpg
+|   |       3e404228-cae2-41b4-9756-ff46d03047d1.png
+|   |       68c82f34-e322-4d9b-8813-71c020ddd8da.jpg
+|   |       82d8cd9d-e097-4dd1-a89d-eec332fe9b34.jpg
+|   |       8f131ae4-3296-46f8-83cf-b890d3fa8dcb.png
+|   |       ab9c10a4-a928-43cb-8aa3-35fb234efcb4.png
+|   |       d4c8d93f-6068-4e86-8fbc-96d94f51abdb.jpg
+|   |       e01f2838-0fd0-4ff8-8d67-f023a867a56a.png
+|   |       
+|   \---restaurants
+|           3f4fe3d0-656f-4e00-bbd0-47152a6ef8e3.jpg
+|           53a93e30-fb51-464d-80df-cbcbbfee3dae.jpg
+|           
+\---vendor
+   
+                    

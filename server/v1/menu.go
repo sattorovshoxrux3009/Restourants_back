@@ -43,7 +43,21 @@ func saveMenuImage(c *fiber.Ctx, file *multipart.FileHeader) (string, error) {
 	return "/uploads/menu/" + newFileName, nil
 }
 
-// Create menu
+// @Summary Create Menu Item
+// @Description Create a new menu item for a restaurant
+// @Tags menu
+// @Accept multipart/form-data
+// @Produce json
+// @Security BearerAuth
+// @Param restaurantid formData string true "Restaurant ID"
+// @Param name formData string true "Menu item name"
+// @Param price formData number true "Menu item price"
+// @Param description formData string true "Menu item description"
+// @Param image formData file false "Menu item image"
+// @Success 201 {object} models.MenuResponse
+// @Failure 400 {object} models.ErrorResponse
+// @Failure 401 {object} models.ErrorResponse
+// @Router /v1/menu [post]
 func (h *handlerV1) CreateSMenu(c *fiber.Ctx) error {
 	restaurantId, _ := strconv.Atoi(c.FormValue("restaurantid"))
 	price, _ := strconv.ParseFloat(c.FormValue("price"), 64)
